@@ -2,7 +2,7 @@
 ## Due October 25th 2026
 Map - yourname
 
-Player - yourname
+Player - lina taalba
 
 Orders List - yourname
 
