@@ -6,7 +6,7 @@ Player - lina taalba
 
 Orders List - yourname
 
-Cards Deck - yourname
+Cards Deck - Chloe
 
 Game Engine - Ali
 
