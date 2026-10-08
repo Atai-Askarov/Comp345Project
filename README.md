@@ -1,6 +1,6 @@
 # Comp345 - Simple Risk Game
 ## Due October 25th 2026
-Map - yourname
+Map - Atai
 
 Player - lina taalba
 
