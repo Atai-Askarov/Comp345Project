@@ -4,7 +4,7 @@ Map - Atai
 
 Player - lina taalba
 
-Orders List - yourname
+Orders List - Randhall
 
 Cards Deck - Chloe
 
