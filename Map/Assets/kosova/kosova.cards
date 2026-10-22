@@ -1,0 +1,57 @@
+; cards: kosova.cards, by Fatos Berisha
+; cards made with the map maker
+; yura.net Risk 1.0.9.7
+
+[cards]
+Infantry 1
+Cannon 2
+Infantry 3
+Infantry 4
+Cavalry 5
+Cavalry 6
+Cavalry 7
+Cannon 8
+Cannon 9
+Cannon 10
+Cavalry 11
+Cannon 12
+Infantry 13
+Infantry 14
+Cannon 15
+Cannon 16
+Cavalry 17
+Cavalry 18
+Infantry 19
+Cavalry 20
+Infantry 21
+Infantry 22
+Cavalry 23
+Cannon 24
+Cannon 25
+Infantry 26
+Cannon 27
+Cavalry 28
+Cavalry 29
+Infantry 30
+wildcard
+wildcard
+
+;destroy x occupy x x continents x x x
+;destroy (Player) occupy (int int) continents (Continent Continent Continent)
+; * = any
+[missions]
+0	0 0	5 2 0	Conquer the districts of PRIZREN and PRISHTINË.
+0	0 0	7 6 2	Conquer the districts of DUKAGJIN, DRENICË and PRISHTINË.
+0	0 0	3 7 *	Conquer the districts of GJILAN and DUKAGJIN and a third district of your choice.
+0	0 0	5 4 0	Conquer the districts of PRIZREN and FERIZAJ.
+0	0 0	3 2 *	Conquer the districts of GJILAN and PRISHTINË and a third continent of your choice.
+0	0 0	1 6 0	Conquer the districts of MITROVICË and DRENICË.
+0	0 0	1 4 0	Conquer the districts of MITROVICË and FERIZAJ.
+0	13 2	0 0 0	Occupy 13 municipalities of your choice and occupy each with at least 2 armies.
+0	18 1	0 0 0	Occupy 18 municipalities of your choice and occupy each with at least 1 army.
+1	18 1	0 0 0	Destroy all of PLAYER1's TROOPS. If they are yours or they have already been destroyed by another player then your mission is: Occupy 18 municipalities.
+2	18 1	0 0 0	Destroy all of PLAYER2's TROOPS. If they are yours or they have already been destroyed by another player then your mission is: Occupy 18 municipalities.
+3	18 1	0 0 0	Destroy all of PLAYER3's TROOPS. If they are yours or they have already been destroyed by another player then your mission is: Occupy 18 municipalities.
+4	18 1	0 0 0	Destroy all of PLAYER4's TROOPS. If they are yours or they have already been destroyed by another player then your mission is: Occupy 18 municipalities.
+5	18 1	0 0 0	Destroy all of PLAYER5's TROOPS. If they are yours or they have already been destroyed by another player then your mission is: Occupy 18 municipalities.
+6	18 1	0 0 0	Destroy all of PLAYER6's TROOPS. If they are yours or they have already been destroyed by another player then your mission is: Occupy 18 municipalities.
