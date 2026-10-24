@@ -56,27 +56,27 @@ public:
 	//Operator Overloading
 
 	OrdersList& operator=(const OrdersList& copied);
-	
+
 
 	//Acessor & Mutators
 
 	void add(Orders* order);
 	void remove(int elemIndex);
 	void move(int iniIndex, int newIndex);
-	
+
 	//const vector<Orders*> remove(const string& order); -- removing per order type could be useful
 
 	//Getters
 
 	std::vector<Orders*>* getOrdersList();
 
-	Order* getOrder(int elemIndex);
+	Orders* getOrder(int elemIndex);
 
 	size_t getOrdersListSize();
 
 private:
 	friend std::ostream& operator<<(std::ostream&, const OrdersList&);
-}
+};
 
 class deploy : public Orders {
 public:
@@ -88,7 +88,7 @@ public:
 
 private:
 	const std::string name;
-	Order* clone() const override;
+	Orders* clone() const override;
 	std::ostream& print(std::ostream&) const override;
 };
 
@@ -102,7 +102,7 @@ public:
 
 private:
 	const std::string name;
-	Order* clone() const override;
+	Orders* clone() const override;
 	std::ostream& print(std::ostream&) const override;
 };
 
@@ -116,7 +116,7 @@ public:
 
 private:
 	const std::string name;
-	Order* clone() const override;
+	Orders* clone() const override;
 	std::ostream& print(std::ostream&) const override;
 };
 
@@ -130,7 +130,7 @@ public:
 
 private:
 	const std::string name;
-	Order* clone() const override;
+	Orders* clone() const override;
 	std::ostream& print(std::ostream&) const override;
 };
 
@@ -144,7 +144,7 @@ public:
 
 private:
 	const std::string name;
-	Order* clone() const override;
+	Orders* clone() const override;
 	std::ostream& print(std::ostream&) const override;
 };
 
@@ -158,8 +158,10 @@ public:
 
 private:
 	const std::string name;
-	Order* clone() const override;
+	Orders* clone() const override;
 	std::ostream& print(std::ostream&) const override;
 };
+
+#endif
 
 
