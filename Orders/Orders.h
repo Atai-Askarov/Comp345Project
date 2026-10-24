@@ -87,7 +87,79 @@ public:
 	void execute() override;
 
 private:
-	
-
+	const std::string name;
+	Order* clone() const override;
+	std::ostream& print(std::ostream&) const override;
 };
+
+class advance : public Orders {
+public:
+	advance();
+	~advance() override;
+	std::string getName() const override;
+	bool validate() const override;
+	void execute() override;
+
+private:
+	const std::string name;
+	Order* clone() const override;
+	std::ostream& print(std::ostream&) const override;
+};
+
+class bomb : public Orders {
+public:
+	bomb();
+	~bomb() override;
+	std::string getName() const override;
+	bool validate() const override;
+	void execute() override;
+
+private:
+	const std::string name;
+	Order* clone() const override;
+	std::ostream& print(std::ostream&) const override;
+};
+
+class blockade : public Orders {
+public:
+	blockade();
+	~blockade() override;
+	std::string getName() const override;
+	bool validate() const override;
+	void execute() override;
+
+private:
+	const std::string name;
+	Order* clone() const override;
+	std::ostream& print(std::ostream&) const override;
+};
+
+class airlift : public Orders {
+public:
+	airlift();
+	~airlift() override;
+	std::string getName() const override;
+	bool validate() const override;
+	void execute() override;
+
+private:
+	const std::string name;
+	Order* clone() const override;
+	std::ostream& print(std::ostream&) const override;
+};
+
+class negotiate : public Orders {
+public:
+	negotiate();
+	~negotiate() override;
+	std::string getName() const override;
+	bool validate() const override;
+	void execute() override;
+
+private:
+	const std::string name;
+	Order* clone() const override;
+	std::ostream& print(std::ostream&) const override;
+};
+
 
