@@ -1,7 +1,12 @@
 #include <cstdlib>
 #include <iomanip>
+#include <algorithm>
+#include <memory>
+#include <stdexcept>
 #include "Orders.h"
 
+
+Orders::~Orders() {}
 
 //Orders stream
 
@@ -15,40 +20,56 @@ OrdersList::OrdersList() {}
 
 //Destructor
 OrdersList::~OrdersList() {
+<<<<<<< Updated upstream
 	//vector<Orders*>().swap(ol);
+=======
+    for (Orders* order : oL) {
+        delete order;
+    }
+>>>>>>> Stashed changes
 }
 
 //Copy Constructor
-OrdersList::OrdersList(const OrdersList& ol) {
-	unsigned listLength = ol.oL.size();
-	oL = std::vector<Orders*>(listLength);
-	for (unsigned i = 0; i < listLength; i++) {
-		oL[i] = ol.oL[i]->clone();
-	}
+OrdersList::OrdersList(const OrdersList& other) {
+    // Clean up partial clones if copying an order throws.
+    try {
+        for (Orders* order : other.oL) {
+            std::unique_ptr<Orders> copy(order->clone());
+            add(copy.get());
+            copy.release();
+        }
+    } catch (...) {
+        for (Orders* order : oL) {
+            delete order;
+        }
+        throw;
+    }
 }
 
 //Add method
 void OrdersList::add(Orders* order) {
-	if(order) {
-		oL.push_back(order);
-	}
-	else {
-		std::runtime_error("Error: Adding null pointer to OrdersList.");
-	}
+    if (!order) {
+        throw std::invalid_argument("Cannot add a null order.");
+    }
+    if (std::find(oL.begin(), oL.end(), order) != oL.end()) {
+        throw std::invalid_argument("Order already belongs to this list.");
+    }
+    oL.push_back(order);
 }
 
 //Remove method
 void OrdersList::remove(int elemIndex) {
-	unsigned listLength = oL.size();
+	size_t listLength = oL.size();
 	if (listLength == 0) {
 		throw std::runtime_error("Error: Can't remove from empty OrdersList.");
 	}
-	else if (elemIndex < 0 || elemIndex >= listLength)
+	else if (elemIndex < 0 || static_cast<size_t>(elemIndex) >= listLength)
 	{
 		throw std::runtime_error("Error: Index out of bound.");
 	}
 	else
 	{
+		delete oL[elemIndex];
 		oL.erase(oL.begin() + elemIndex);
 	}
 	
@@ -56,67 +77,35 @@ void OrdersList::remove(int elemIndex) {
 
 //Move method
 void OrdersList::move(int iniIndex, int newIndex) {
-	unsigned listLength = oL.size();
-	if (listLength == 0) {
-		throw std::runtime_error("Error: No values to move.");
-	}
-	else if (listLength == 1)
-	{
-		throw std::runtime_error("Error: The singular value can't move.");
-	}
-	else if (iniIndex < 0 || iniIndex >= listLength || newIndex < 0 || newIndex >= listLength)
-	{
-		throw std::runtime_error("Error: At least one index is out of bounds.");
-	}
-	else
-	{
-		Orders* temp = oL[iniIndex];
-		oL[iniIndex] = oL[newIndex];
-		oL[newIndex] = temp;
-	}
+    if (iniIndex < 0 || newIndex < 0
+            || static_cast<size_t>(iniIndex) >= oL.size()
+            || static_cast<size_t>(newIndex) >= oL.size()) {
+        throw std::out_of_range("Order index out of bounds.");
+    }
+    // Reposition the selected order without swapping unrelated entries.
+    Orders* order = oL[iniIndex];
+    oL.erase(oL.begin() + iniIndex);
+    oL.insert(oL.begin() + newIndex, order);
 }
 
 //Execute method
 void OrdersList::execute() {
-	unsigned listLength = oL.size();
-	if (listLength == 0) {
-		throw std::runtime_error("Error: No order to execute.");
-	}
-	else {
-		for (auto it = oL.begin(); it != oL.end();) {
-			if (!oL.empty()) {
-				it->execute();
-				it = oL.erase(it);
-			}
-			else {
-				++it;
-			}
-		}
-	}
-	
+    if (oL.empty()) {
+        throw std::runtime_error("No order to execute.");
+    }
+    while (!oL.empty()) {
+        oL.front()->execute();
+        remove(0); // Deletes only after execute() returns successfully.
+    }
 }
 
 //Assignment operator overload
 OrdersList& OrdersList::operator=(const OrdersList& copied) {
-	//Assigning left to right side
-	if (&copied == this) {
-		return *this;
-	}
-
-	unsigned copiedListLength = copied.oL.size();
-
-	for (auto o = oL.begin(); o != oL.end();) {
-		{
-			o = oL.erase(o);
-		}
-	}
-
-	oL = std::vector<Orders*>(copiedListLength);
-
-	for (size_t oo = 0; oo < copiedListLength; oo++) {
-		oL[oo] = copied.oL[oo]->clone();
-	}
-	return *this;
+    if (this != &copied) {
+        OrdersList copy(copied);
+        oL.swap(copy.oL); // The temporary deletes the old orders.
+    }
+    return *this;
 }
 
 size_t OrdersList::getOrdersListSize() {
@@ -125,7 +114,7 @@ size_t OrdersList::getOrdersListSize() {
 
 Orders* OrdersList::getOrder(int elemIndex) {
 	
-	if (elemIndex >= 0 && elemIndex < oL.size())
+	if (elemIndex >= 0 && static_cast<size_t>(elemIndex) < oL.size())
 	{
 		return oL[elemIndex];
 	}
@@ -153,9 +142,13 @@ std::vector<Orders*>* OrdersList::getOrdersList() {
 
 // Actions
 
+<<<<<<< Updated upstream
 Deploy::Deploy() {
 	name = "Deploy";
 }
+=======
+Deploy::Deploy() : name("Deploy") {}
+>>>>>>> Stashed changes
 
 std::string Deploy::getName() const {
 	return name;
@@ -186,9 +179,13 @@ Orders* Deploy::clone() const {
 Deploy::~Deploy() {
 }
 
+<<<<<<< Updated upstream
 Advance::Advance() {
 	name = "Advance";
 }
+=======
+Advance::Advance() : name("Advance") {}
+>>>>>>> Stashed changes
 
 std::string Advance::getName() const {
 	return name;
@@ -219,9 +216,13 @@ Orders* Advance::clone() const {
 Advance::~Advance() {
 }
 
+<<<<<<< Updated upstream
 Bomb::Bomb(){
 	name = "Bomb";
 }
+=======
+Bomb::Bomb() : name("Bomb") {}
+>>>>>>> Stashed changes
 
 std::string Bomb::getName() const {
 	return name;
@@ -252,9 +253,13 @@ Orders* Bomb::clone() const {
 Bomb::~Bomb() {
 }
 
+<<<<<<< Updated upstream
 Blockade::Blockade(){
 	name = "Blockade";
 }
+=======
+Blockade::Blockade() : name("Blockade") {}
+>>>>>>> Stashed changes
 
 std::string Blockade::getName() const {
 	return name;
@@ -285,9 +290,13 @@ Orders* Blockade::clone() const {
 Blockade::~Blockade() {
 }
 
+<<<<<<< Updated upstream
 Airlift::Airlift(){
 	name = "Airlift";
 }
+=======
+Airlift::Airlift() : name("Airlift") {}
+>>>>>>> Stashed changes
 
 std::string Airlift::getName() const {
 	return name;
@@ -318,9 +327,13 @@ Orders* Airlift::clone() const {
 Airlift::~Airlift() {
 }
 
+<<<<<<< Updated upstream
 Negotiate::Negotiate(){
 	name = "Negotiate";
 }
+=======
+Negotiate::Negotiate() : name("Negotiate") {}
+>>>>>>> Stashed changes
 
 std::string Negotiate::getName() const {
 	return name;

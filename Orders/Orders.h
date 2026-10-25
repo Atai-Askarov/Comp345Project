@@ -45,6 +45,7 @@ private:
 class OrdersList {
 
 private:
+	// Owns each stored order; callers must not delete an inserted order.
 	std::vector<Orders*> oL{};
 
 public:
@@ -62,6 +63,7 @@ public:
 
 	//Acessor & Mutators
 
+	// Takes ownership after successful insertion.
 	void add(Orders* order);
 	void remove(int elemIndex);
 	void move(int iniIndex, int newIndex);

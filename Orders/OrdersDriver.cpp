@@ -7,23 +7,15 @@ int main() {
 	OrdersList player1;
 
 
-	// Create some orders
-	Deploy aDeploy;
-	Advance anAdvance;
-	Bomb aBomb;
-	Blockade aBlockade;
-	Airlift anAirlift;
-	Negotiate aNegotiate;
-	Deploy anotherDeploy;
-	
-	// Add orders to the list
-	player1.add(&aDeploy);
-	player1.add(&anAdvance);
-	player1.add(&aBomb);
-	player1.add(&aBlockade);
-	player1.add(&anAirlift);
-	player1.add(&aNegotiate);
-	player1.add(&anotherDeploy);
+	// OrdersList owns and deletes these dynamically allocated orders.
+	// Do not add addresses of local objects to this owning list.
+	player1.add(new Deploy());
+	player1.add(new Advance());
+	player1.add(new Bomb());
+	player1.add(new Blockade());
+	player1.add(new Airlift());
+	player1.add(new Negotiate());
+	player1.add(new Deploy());
 
 	// Print the orders list
 	std::cout << "Orders List: " << std::endl;
