@@ -1,8 +1,11 @@
 #include "Player.h"
+#include "../Map/Map.h"
+#include "../Orders/Orders.h"
 
 #include <algorithm>
 #include <memory>
 #include <ostream>
+#include <stdexcept>
 #include <utility>
 
 // Use standard library names directly, such as string, vector, and cout.
@@ -25,8 +28,7 @@ Player::Player(const string& playerName)
 }
 
 // Copy the folder's lists, not the map's Territory objects.
-// Hand and OrdersList remain borrowed connections in this initial version.
-// TODO: Revisit their ownership and copying when those classes are available.
+// All borrowed pointers remain shared; copying never changes territory owners.
 Player::Player(const Player& other)
     : name(nullptr), territories(nullptr), attackTargets(nullptr),
       hand(nullptr), orders(nullptr) {
@@ -65,11 +67,29 @@ Player::~Player() {
 // A const reference lets the caller read the name without copying/changing it.
 const string& Player::getName() const { return *name; }
 
-// Ignore missing territories and duplicates so the list stays meaningful.
+// Register a territory once, then transfer it from its previous owner.
 void Player::addTerritory(Territory* territory) {
-    if (territory && find(territories->begin(), territories->end(), territory)
-                         == territories->end()) {
+    if (!territory) {
+        return;
+    }
+    // Allocate before changing ownership, so allocation failure leaves it intact.
+    if (find(territories->begin(), territories->end(), territory)
+            == territories->end()) {
         territories->push_back(territory);
+    }
+    Player* previousOwner = territory->getOwner();
+    if (previousOwner && previousOwner != this) {
+        previousOwner->removeTerritory(territory);
+    }
+    territory->setOwner(this);
+}
+
+// Removing a copied reference must not clear the real owner's connection.
+void Player::removeTerritory(Territory* territory) {
+    territories->erase(remove(territories->begin(), territories->end(), territory),
+                       territories->end());
+    if (territory && territory->getOwner() == this) {
+        territory->setOwner(nullptr);
     }
 }
 
@@ -78,11 +98,19 @@ const vector<Territory*>& Player::getTerritories() const {
     return *territories;
 }
 
-// Return a separate list, like handing the general a photocopy of the folder.
-vector<Territory*> Player::toDefend() const { return *territories; }
+// Copies can contain shared references without owning those territories.
+vector<Territory*> Player::toDefend() const {
+    vector<Territory*> owned;
+    for (Territory* territory : *territories) {
+        if (territory && territory->getOwner() == this) {
+            owned.push_back(territory);
+        }
+    }
+    return owned;
+}
 
 // Store unique, non-null targets supplied by the caller.
-// This does not check adjacency or ownership; Map integration will do that.
+// Kept for compatibility; automatic toAttack() does not use this list.
 void Player::setAttackTargets(const vector<Territory*>& targets) {
     vector<Territory*> filtered;
     for (Territory* target : targets) {
@@ -95,7 +123,19 @@ void Player::setAttackTargets(const vector<Territory*>& targets) {
 }
 
 // Choosing targets does not execute an attack.
-vector<Territory*> Player::toAttack() const { return *attackTargets; }
+vector<Territory*> Player::toAttack() const {
+    vector<Territory*> targets;
+    for (Territory* territory : toDefend()) {
+        for (Territory* neighbour : territory->getNeighbours()) {
+            if (neighbour && neighbour->getOwner() != this
+                    && find(targets.begin(), targets.end(), neighbour)
+                           == targets.end()) {
+                targets.push_back(neighbour);
+            }
+        }
+    }
+    return targets;
+}
 
 // Attach/read the player's borrowed card wallet.
 void Player::setHand(Hand* playerHand) { hand = playerHand; }
@@ -105,11 +145,40 @@ Hand* Player::getHand() const { return hand; }
 void Player::setOrdersList(OrdersList* playerOrders) { orders = playerOrders; }
 OrdersList* Player::getOrdersList() const { return orders; }
 
-// Print a readable summary without needing teammates' class definitions.
+// Use the concrete class names declared in the real Orders header.
+void Player::issueOrder(const string& orderType) {
+    if (!orders) {
+        throw logic_error("Attach an OrdersList before issuing an order.");
+    }
+
+    unique_ptr<Orders> order;
+    if (orderType == "deploy") {
+        order = make_unique<deploy>();
+    } else if (orderType == "advance") {
+        order = make_unique<::advance>();
+    } else if (orderType == "bomb") {
+        order = make_unique<bomb>();
+    } else if (orderType == "blockade") {
+        order = make_unique<blockade>();
+    } else if (orderType == "airlift") {
+        order = make_unique<airlift>();
+    } else if (orderType == "negotiate") {
+        order = make_unique<negotiate>();
+    } else {
+        throw invalid_argument("Unknown order type: " + orderType);
+    }
+
+    // Keep cleanup automatic if insertion throws. The list must own and
+    // eventually delete the order after a successful insertion.
+    orders->add(order.get());
+    order.release();
+}
+
+// Report actual ownership rather than counting shared references as owned.
 ostream& operator<<(ostream& out, const Player& player) {
     out << "Player: " << *player.name
-        << " | owned territories: " << player.territories->size()
-        << " | attack targets: " << player.attackTargets->size()
+        << " | owned territories: " << player.toDefend().size()
+        << " | attack targets: " << player.toAttack().size()
         << " | hand: " << (player.hand ? "attached" : "not attached")
         << " | orders: " << (player.orders ? "attached" : "not attached");
     return out;

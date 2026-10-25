@@ -49,6 +49,7 @@ private:
 public:
 	//Constructor & Destructor
 
+	OrdersList();
 	OrdersList(const OrdersList& ol);
 	//OrdersList(const string& user, const vector<Orders>& ol); -- might be useful later
 	~OrdersList();

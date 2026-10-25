@@ -11,6 +11,8 @@ std::ostream& operator<<(std::ostream& os, const Orders& order) {
 
 //OrdersList
 
+OrdersList::OrdersList() {}
+
 //Destructor
 OrdersList::~OrdersList{
 	//vector<Orders*>().swap(ol);
