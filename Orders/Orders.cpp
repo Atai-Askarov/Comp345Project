@@ -14,7 +14,7 @@ std::ostream& operator<<(std::ostream& os, const Orders& order) {
 OrdersList::OrdersList() {}
 
 //Destructor
-OrdersList::~OrdersList{
+OrdersList::~OrdersList() {
 	//vector<Orders*>().swap(ol);
 }
 
@@ -153,9 +153,10 @@ std::vector<Orders*>* OrdersList::getOrdersList() {
 
 // Actions
 
-Deploy::Deploy() { Deploy::name = "Deploy"; }
+Deploy::Deploy() {
+	name = "Deploy";
+}
 
-const std::string Deploy::name = "Deploy";
 std::string Deploy::getName() const {
 	return name;
 }
@@ -185,9 +186,10 @@ Orders* Deploy::clone() const {
 Deploy::~Deploy() {
 }
 
-Advance::Advance(){}
+Advance::Advance() {
+	name = "Advance";
+}
 
-const std::string Advance::name = "Advance";
 std::string Advance::getName() const {
 	return name;
 }
@@ -217,9 +219,10 @@ Orders* Advance::clone() const {
 Advance::~Advance() {
 }
 
-Bomb::Bomb(){}
+Bomb::Bomb(){
+	name = "Bomb";
+}
 
-const std::string Bomb::name = "Bomb";
 std::string Bomb::getName() const {
 	return name;
 }
@@ -249,9 +252,10 @@ Orders* Bomb::clone() const {
 Bomb::~Bomb() {
 }
 
-Blockade::Blockade(){}
+Blockade::Blockade(){
+	name = "Blockade";
+}
 
-const std::string Blockade::name = "Blockade";
 std::string Blockade::getName() const {
 	return name;
 }
@@ -281,9 +285,10 @@ Orders* Blockade::clone() const {
 Blockade::~Blockade() {
 }
 
-Airlift::Airlift(){}
+Airlift::Airlift(){
+	name = "Airlift";
+}
 
-const std::string Airlift::name = "Airlift";
 std::string Airlift::getName() const {
 	return name;
 }
@@ -313,9 +318,10 @@ Orders* Airlift::clone() const {
 Airlift::~Airlift() {
 }
 
-Negotiate::Negotiate(){}
+Negotiate::Negotiate(){
+	name = "Negotiate";
+}
 
-const std::string Negotiate::name = "Negotiate";
 std::string Negotiate::getName() const {
 	return name;
 }
