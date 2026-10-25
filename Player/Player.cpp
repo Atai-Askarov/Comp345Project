@@ -1,9 +1,11 @@
 #include "Player.h"
 #include "../Map/Map.h"
+#include "../Orders/Orders.h"
 
 #include <algorithm>
 #include <memory>
 #include <ostream>
+#include <stdexcept>
 #include <utility>
 
 // Use standard library names directly, such as string, vector, and cout.
@@ -142,6 +144,32 @@ Hand* Player::getHand() const { return hand; }
 // Attach/read the player's borrowed order notebook.
 void Player::setOrdersList(OrdersList* playerOrders) { orders = playerOrders; }
 OrdersList* Player::getOrdersList() const { return orders; }
+
+// The list owns the new order; Player continues to borrow the list itself.
+void Player::issueOrder(const string& orderType) {
+    if (!orders) {
+        throw logic_error("Attach an OrdersList before issuing an order.");
+    }
+    unique_ptr<Orders> order;
+    if (orderType == "deploy") {
+        order = make_unique<Deploy>();
+    } else if (orderType == "advance") {
+        order = make_unique<Advance>();
+    } else if (orderType == "bomb") {
+        order = make_unique<Bomb>();
+    } else if (orderType == "blockade") {
+        order = make_unique<Blockade>();
+    } else if (orderType == "airlift") {
+        order = make_unique<Airlift>();
+    } else if (orderType == "negotiate") {
+        order = make_unique<Negotiate>();
+    } else {
+        throw invalid_argument("Unknown order type: " + orderType);
+    }
+    // If insertion throws, the temporary pointer cleans up automatically.
+    orders->add(order.get());
+    order.release();
+}
 
 // Report actual ownership rather than counting shared references as owned.
 ostream& operator<<(ostream& out, const Player& player) {

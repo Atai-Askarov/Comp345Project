@@ -1,6 +1,7 @@
 #include "Player.h"
 #include "../Cards/Cards.h"
 #include "../Map/Map.h"
+#include "../Orders/Orders.h"
 
 #include <iostream>
 #include <fstream>
@@ -69,6 +70,9 @@ int main() {
         // each Hand deletes its cards. Players only borrow these objects.
         Hand hand1;
         Hand hand2;
+        // Lists outlive all Players that borrow them.
+        OrdersList orders1;
+        OrdersList orders2;
         unique_ptr<Map> map;
 
         cout << "PlayerDriver\n\n=== 1. Create Players ===\n";
@@ -78,6 +82,8 @@ int main() {
         Player player2(name2);
         player1.setHand(&hand1);
         player2.setHand(&hand2);
+        player1.setOrdersList(&orders1);
+        player2.setOrdersList(&orders2);
         Player* players[] = {&player1, &player2};
 
         cout << "\n=== 2. Assign Territories ===\n";
@@ -204,7 +210,17 @@ int main() {
         }
         cout << "\n\n";
 
-        cout << "=== 8. Orders ===\nPending integration with the real Orders component.\n";
+        cout << "=== 8. Orders ===\n";
+        // Assignment shared Player 1's list. Reattach Player 2's own empty
+        // list so this section demonstrates each Player issuing orders.
+        player2.setOrdersList(&orders2);
+        cout << "Player 1 issues a Deploy order.\n";
+        player1.issueOrder("deploy");
+        cout << "Player 1 orders: " << *player1.getOrdersList();
+        cout << "Player 2 issues an Advance order.\n";
+        player2.issueOrder("advance");
+        cout << "Player 2 orders: " << *player2.getOrdersList();
+        cout << "Orders are stored, not executed.\n";
 
         // Clear owner back-pointers before the Players leave scope.
         for (Player* player : players) {

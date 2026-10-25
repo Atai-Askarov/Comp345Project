@@ -48,8 +48,9 @@ public:
     void setOrdersList(OrdersList* orders);
     OrdersList* getOrdersList() const;
 
-    // TODO: Add issueOrder() when Orders integration is resumed.
-    // It must create an order and add it to this player's OrdersList.
+    // Create and store an order without executing it. Requires an attached list.
+    // Types: deploy, advance, bomb, blockade, airlift, negotiate (lowercase).
+    void issueOrder(const string& orderType = "deploy");
 
     friend ostream& operator<<(ostream& out, const Player& player);
 

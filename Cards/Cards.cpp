@@ -2,13 +2,8 @@
 #include "Cards.h"
 #include <cstdlib>
 #include <algorithm>
-
-// order list placeholder implementation
-void OrdersList::addOrder(const std::string& orderName) {
-    std::cout << orderName << " order added to player's order list." << std::endl;
-}
-
-
+#include <memory>
+#include <stdexcept>
 
 // CARD IMPLEMENTATION------------------------
 // default constructor
@@ -81,7 +76,17 @@ std::ostream& operator<<(std::ostream& os, const Card& card) {
 // play function
 void Card::play(Hand& hand, Deck& deck, OrdersList& ordersList) {
     std::cout << "Playing card: " << getTypeAsString() << std::endl; // shows current playing card
-    ordersList.addOrder(getTypeAsString()); // add order to orders list
+    std::unique_ptr<Orders> order;
+    switch (*type) {
+        case CardType::Bomb: order = std::make_unique<Bomb>(); break;
+        case CardType::Reinforcement: order = std::make_unique<Deploy>(); break;
+        case CardType::Blockade: order = std::make_unique<Blockade>(); break;
+        case CardType::Airlift: order = std::make_unique<Airlift>(); break;
+        case CardType::Diplomacy: order = std::make_unique<Negotiate>(); break;
+        default: throw std::invalid_argument("Unknown card type.");
+    }
+    ordersList.add(order.get());
+    order.release(); // The list now owns the order.
     
     // create a fresh deep copy to put back into the deck pool
     deck.addCard(new Card(*this));

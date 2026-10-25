@@ -10,12 +10,8 @@
 class Deck;
 class Hand;
 
-// orders list placeholder implementation
-class OrdersList {
-public:
-    void addOrder(const std::string& orderName);
-};
-
+// Share the real OrdersList with Player.
+#include "../Orders/Orders.h"
 
 // card types
 // enum class for type safety and avoiding conversions
