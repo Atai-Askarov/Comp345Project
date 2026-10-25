@@ -20,13 +20,9 @@ OrdersList::OrdersList() {}
 
 //Destructor
 OrdersList::~OrdersList() {
-<<<<<<< Updated upstream
-	//vector<Orders*>().swap(ol);
-=======
     for (Orders* order : oL) {
         delete order;
     }
->>>>>>> Stashed changes
 }
 
 //Copy Constructor
@@ -142,13 +138,7 @@ std::vector<Orders*>* OrdersList::getOrdersList() {
 
 // Actions
 
-<<<<<<< Updated upstream
-Deploy::Deploy() {
-	name = "Deploy";
-}
-=======
 Deploy::Deploy() : name("Deploy") {}
->>>>>>> Stashed changes
 
 std::string Deploy::getName() const {
 	return name;
@@ -179,13 +169,7 @@ Orders* Deploy::clone() const {
 Deploy::~Deploy() {
 }
 
-<<<<<<< Updated upstream
-Advance::Advance() {
-	name = "Advance";
-}
-=======
 Advance::Advance() : name("Advance") {}
->>>>>>> Stashed changes
 
 std::string Advance::getName() const {
 	return name;
@@ -216,13 +200,7 @@ Orders* Advance::clone() const {
 Advance::~Advance() {
 }
 
-<<<<<<< Updated upstream
-Bomb::Bomb(){
-	name = "Bomb";
-}
-=======
 Bomb::Bomb() : name("Bomb") {}
->>>>>>> Stashed changes
 
 std::string Bomb::getName() const {
 	return name;
@@ -253,13 +231,7 @@ Orders* Bomb::clone() const {
 Bomb::~Bomb() {
 }
 
-<<<<<<< Updated upstream
-Blockade::Blockade(){
-	name = "Blockade";
-}
-=======
 Blockade::Blockade() : name("Blockade") {}
->>>>>>> Stashed changes
 
 std::string Blockade::getName() const {
 	return name;
@@ -290,13 +262,7 @@ Orders* Blockade::clone() const {
 Blockade::~Blockade() {
 }
 
-<<<<<<< Updated upstream
-Airlift::Airlift(){
-	name = "Airlift";
-}
-=======
 Airlift::Airlift() : name("Airlift") {}
->>>>>>> Stashed changes
 
 std::string Airlift::getName() const {
 	return name;
@@ -327,13 +293,7 @@ Orders* Airlift::clone() const {
 Airlift::~Airlift() {
 }
 
-<<<<<<< Updated upstream
-Negotiate::Negotiate(){
-	name = "Negotiate";
-}
-=======
 Negotiate::Negotiate() : name("Negotiate") {}
->>>>>>> Stashed changes
 
 std::string Negotiate::getName() const {
 	return name;
