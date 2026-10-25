@@ -3,6 +3,7 @@
 #include "../Map/Map.h"
 
 #include <iostream>
+#include <fstream>
 #include <memory>
 #include <sstream>
 #include <stdexcept>
@@ -68,10 +69,7 @@ int main() {
         // each Hand deletes its cards. Players only borrow these objects.
         Hand hand1;
         Hand hand2;
-        Map map;
-        auto continent = make_unique<Continent>("Demo Continent", 0, "blue");
-        map.addContinent(continent.get());
-        Continent* demoContinent = continent.release();
+        unique_ptr<Map> map;
 
         cout << "PlayerDriver\n\n=== 1. Create Players ===\n";
         string name1 = readName("Enter Player 1 name: ");
@@ -83,31 +81,67 @@ int main() {
         Player* players[] = {&player1, &player2};
 
         cout << "\n=== 2. Assign Territories ===\n";
-        cout << "Counts may range from 0 to 100.\n";
-        int nextId = 1;
-        for (Player* player : players) {
-            int count = readNumber("How many territories for " + player->getName()
-                                   + "? ", 0, 100);
-            for (int i = 0; i < count; ++i) {
-                string name = readName("Territory " + to_string(i + 1) + " name: ");
-                auto territory = make_unique<Territory>(nextId++, name, demoContinent);
-                map.addCountry(territory.get());
-                Territory* added = territory.release();
-                demoContinent->addTerritory(added);
-                player->addTerritory(added);
+        const string mapFiles[] = {
+            "artic/artic.map", "bigeurope/bigeurope.map", "europass/europass.map",
+            "europe/europe.map", "Falkland-Islands/Falkland-Islands.map",
+            "google/google.map", "kosova/kosova.map",
+            "MiddleEast-Qatar/MiddleEast-Qatar.map", "solar/solar.map",
+            "spain/spain.map", "sudamerica/sudamerica.map",
+            "sw_baltic/sw_baltic.map", "us_map/us.map"
+        };
+        cout << "Choose a map (territories and borders come from its file):\n";
+        for (int i = 0; i < 13; ++i) {
+            cout << i + 1 << ". " << mapFiles[i] << '\n';
+        }
+        int choice = readNumber("Map number: ", 1, 13);
+        string mapPath;
+        // Support running from either the project root or the Player folder.
+        string sourceFile = __FILE__;
+        string sourceFolder = sourceFile.substr(0, sourceFile.find_last_of("/\\") + 1);
+        const string folders[] = {"Map/Assets/", "../Map/Assets/",
+                                  sourceFolder + "../Map/Assets/"};
+        for (const string& folder : folders) {
+            ifstream file(folder + mapFiles[choice - 1]);
+            if (file) {
+                mapPath = folder + mapFiles[choice - 1];
+                break;
             }
         }
-
-        // A simple chain gives predictable neighbours without a map file.
-        const vector<Territory*>& countries = map.getCountries();
-        for (size_t i = 1; i < countries.size(); ++i) {
-            countries[i - 1]->addNeighbour(countries[i]);
-            countries[i]->addNeighbour(countries[i - 1]);
+        if (mapPath.empty()) {
+            throw runtime_error("Map file not found. Run from the project root or Player folder.");
         }
-        cout << "Territories form a two-way chain in the order entered:\n";
-        printTerritories("Chain: ", countries);
-        cout << "Each territory neighbours the entries immediately beside it.\n";
-        cout << "If both Players have territories, their boundary territories can attack each other.\n";
+        MapLoader loader;
+        map.reset(loader.loadMap(mapPath));
+        if (!map->validate()) {
+            throw runtime_error("The selected map is invalid.");
+        }
+        const vector<Territory*>& countries = map->getCountries();
+        cout << "Available territories:\n";
+        for (size_t i = 0; i < countries.size(); ++i) {
+            cout << i + 1 << ". " << countries[i]->getName() << '\n';
+        }
+        int remaining = static_cast<int>(countries.size());
+        for (Player* player : players) {
+            int count = readNumber("How many territories for " + player->getName()
+                                   + "? ", 0, remaining);
+            for (int i = 0; i < count; ++i) {
+                Territory* territory = nullptr;
+                while (true) {
+                    int number = readNumber("Choose territory " + to_string(i + 1)
+                                            + " by number: ", 1,
+                                            static_cast<int>(countries.size()));
+                    territory = countries[number - 1];
+                    if (!territory->getOwner()) {
+                        break;
+                    }
+                    cout << "That territory is already assigned. Choose another.\n";
+                }
+                player->addTerritory(territory);
+                --remaining;
+            }
+        }
+        cout << "Borders are taken from the map; no extra connections are added.\n";
+        cout << "Unassigned territories remain unowned and can also be attack targets.\n";
 
         cout << "\n=== 3. Assign Cards ===\n";
         CardType types[] = {CardType::Bomb, CardType::Reinforcement,
