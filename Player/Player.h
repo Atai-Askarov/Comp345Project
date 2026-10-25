@@ -48,10 +48,8 @@ public:
     void setOrdersList(OrdersList* orders);
     OrdersList* getOrdersList() const;
 
-    // Create an order and give it to the attached OrdersList (not execute it).
-    // Supported types: deploy, advance, bomb, blockade, airlift, negotiate.
-    // Throws if no list is attached or the type is unknown.
-    void issueOrder(const string& orderType = "deploy");
+    // TODO: Add issueOrder() when Orders integration is resumed.
+    // It must create an order and add it to this player's OrdersList.
 
     friend ostream& operator<<(ostream& out, const Player& player);
 

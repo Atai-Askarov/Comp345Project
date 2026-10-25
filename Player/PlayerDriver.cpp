@@ -1,7 +1,6 @@
 #include "Player.h"
 #include "../Cards/Cards.h"
 #include "../Map/Map.h"
-#include "../Orders/Orders.h"
 
 #include <iostream>
 #include <memory>
@@ -69,9 +68,6 @@ int main() {
         // each Hand deletes its cards. Players only borrow these objects.
         Hand hand1;
         Hand hand2;
-        // Borrowed lists must outlive the Players, including their copies.
-        OrdersList orders1;
-        OrdersList orders2;
         Map map;
         auto continent = make_unique<Continent>("Demo Continent", 0, "blue");
         map.addContinent(continent.get());
@@ -84,8 +80,6 @@ int main() {
         Player player2(name2);
         player1.setHand(&hand1);
         player2.setHand(&hand2);
-        player1.setOrdersList(&orders1);
-        player2.setOrdersList(&orders2);
         Player* players[] = {&player1, &player2};
 
         cout << "\n=== 2. Assign Territories ===\n";
@@ -142,16 +136,6 @@ int main() {
             printTerritories("To attack: ", player->toAttack());
         }
 
-        // Show each original list before copying/assignment shares pointers.
-        cout << "\n=== 8. Orders ===\n";
-        cout << "Adding a deploy order for " << player1.getName() << ".\n";
-        player1.issueOrder("deploy");
-        cout << player1.getName() << " orders: " << *player1.getOrdersList();
-        cout << "Adding an advance order for " << player2.getName() << ".\n";
-        player2.issueOrder("advance");
-        cout << player2.getName() << " orders: " << *player2.getOrdersList();
-        cout << "Orders are stored, not executed.\n\n";
-
         cout << "=== 6. Copy Constructor ===\n";
         cout << "Creating Player 3 as a copy of " << player1.getName() << "...\n";
         Player player3(player1);
@@ -185,6 +169,8 @@ int main() {
             cout << *card << ' ';
         }
         cout << "\n\n";
+
+        cout << "=== 8. Orders ===\nPending integration with the real Orders component.\n";
 
         // Clear owner back-pointers before the Players leave scope.
         for (Player* player : players) {
