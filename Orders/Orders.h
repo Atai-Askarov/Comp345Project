@@ -66,6 +66,9 @@ public:
 
 	//const vector<Orders*> remove(const string& order); -- removing per order type could be useful
 
+	//Iterate through the list
+	void execute();
+
 	//Getters
 
 	std::vector<Orders*>* getOrdersList();
