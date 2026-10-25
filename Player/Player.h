@@ -21,17 +21,22 @@ public:
     Player();
     Player(const string& name);
     Player(const Player& other);
+    // Copies references without transferring ownership. Transfer/remove any
+    // territories owned by the destination before replacing its reference list.
     Player& operator=(const Player& other);
     ~Player();
 
     const string& getName() const;
     void addTerritory(Territory* territory);
+    void removeTerritory(Territory* territory);
+    // Stored references may include another player's territories after copying.
     const vector<Territory*>& getTerritories() const;
 
     // For Assignment 1, defending all owned territories is a simple strategy.
     vector<Territory*> toDefend() const;
 
-    // Until Map provides adjacency information, targets are supplied explicitly.
+    // Legacy manual list, retained for compatibility. toAttack() now discovers
+    // targets from Map neighbours rather than using this stored list.
     void setAttackTargets(const vector<Territory*>& targets);
 
 
@@ -43,8 +48,8 @@ public:
     void setOrdersList(OrdersList* orders);
     OrdersList* getOrdersList() const;
 
-    // TODO: Add issueOrder() once Orders exposes order creation and insertion.
-    // It must create an Order and add it to this player's OrdersList.
+    // TODO: Add issueOrder() when Orders integration is resumed.
+    // It must create an order and add it to this player's OrdersList.
 
     friend ostream& operator<<(ostream& out, const Player& player);
 
@@ -56,7 +61,7 @@ private:
     vector<Territory*>* territories;
     vector<Territory*>* attackTargets;
 
-    // Temporary borrowed connections until Hand/OrdersList are implemented.
+    // Borrowed connections, shared by copies rather than cloned.
     // The caller must keep these objects alive while Player uses them.
     Hand* hand;
     OrdersList* orders;
