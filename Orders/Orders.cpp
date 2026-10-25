@@ -20,17 +20,17 @@ OrdersList::~OrdersList{
 
 //Copy Constructor
 OrdersList::OrdersList(const OrdersList& ol) {
-	unsigned listLength = ol.oList.size();
-	oList = std::vector<Orders*>(listLength);
+	unsigned listLength = ol.oL.size();
+	oL = std::vector<Orders*>(listLength);
 	for (unsigned i = 0; i < listLength; i++) {
-		oList[i] = ol.oList[i]->clone();
+		oL[i] = ol.oL[i]->clone();
 	}
 }
 
 //Add method
 void OrdersList::add(Orders* order) {
 	if(order) {
-		oList.push_back(order);
+		oL.push_back(order);
 	}
 	else {
 		std::runtime_error("Error: Adding null pointer to OrdersList.");
@@ -39,24 +39,24 @@ void OrdersList::add(Orders* order) {
 
 //Remove method
 void OrdersList::remove(int elemIndex) {
-	unsigned listLength = oList.size();
+	unsigned listLength = oL.size();
 	if (listLength == 0) {
 		throw std::runtime_error("Error: Can't remove from empty OrdersList.");
 	}
 	else if (elemIndex < 0 || elemIndex >= listLength)
 	{
-		throw std::runtime_error("Error: Index out of bound.")
+		throw std::runtime_error("Error: Index out of bound.");
 	}
 	else
 	{
-		oList.erase(oList.begin() + elemIndex);
+		oL.erase(oL.begin() + elemIndex);
 	}
 	
 }
 
 //Move method
-void:OrdersList::move(int iniIndex, int newIndex) {
-	unsigned listLength = oList.size();
+void OrdersList::move(int iniIndex, int newIndex) {
+	unsigned listLength = oL.size();
 	if (listLength == 0) {
 		throw std::runtime_error("Error: No values to move.");
 	}
@@ -70,23 +70,23 @@ void:OrdersList::move(int iniIndex, int newIndex) {
 	}
 	else
 	{
-		Orders* temp = oList[iniIndex];
-		oList[iniIndex] = oList[newIndex];
-		oList[newIndex] = temp;
+		Orders* temp = oL[iniIndex];
+		oL[iniIndex] = oL[newIndex];
+		oL[newIndex] = temp;
 	}
 }
 
 //Execute method
-void:OrdersList::execute() {
-	unsigned listLength = oList.size();
+void OrdersList::execute() {
+	unsigned listLength = oL.size();
 	if (listLength == 0) {
 		throw std::runtime_error("Error: No order to execute.");
 	}
 	else {
-		for (auto it = oList.begin(); it != oList.end();) {
-			if (!oList.empty()) {
+		for (auto it = oL.begin(); it != oL.end();) {
+			if (!oL.empty()) {
 				it->execute();
-				it = oList.erase(it);
+				it = oL.erase(it);
 			}
 			else {
 				++it;
@@ -103,31 +103,31 @@ OrdersList& OrdersList::operator=(const OrdersList& copied) {
 		return *this;
 	}
 
-	unsigned copiedListLength = copied.oList.size();
+	unsigned copiedListLength = copied.oL.size();
 
-	for (auto o = oList.begin(); o != oList.end();) {
+	for (auto o = oL.begin(); o != oL.end();) {
 		{
-			o = oList.erase(o);
+			o = oL.erase(o);
 		}
 	}
 
-	oList = std::vector<Orders*>(copiedListLength);
+	oL = std::vector<Orders*>(copiedListLength);
 
-	for (int oo = 0; oo < copiedListLength; oo++) {
-		oList[oo] = copied.oList[oo]->clone();
+	for (size_t oo = 0; oo < copiedListLength; oo++) {
+		oL[oo] = copied.oL[oo]->clone();
 	}
 	return *this;
 }
 
 size_t OrdersList::getOrdersListSize() {
-	return oList.size();
+	return oL.size();
 }
 
 Orders* OrdersList::getOrder(int elemIndex) {
 	
-	if (elemIndex >= 0 && elemIndex < oList.size())
+	if (elemIndex >= 0 && elemIndex < oL.size())
 	{
-		return oList[elemIndex];
+		return oL[elemIndex];
 	}
 	else
 	{
@@ -137,9 +137,9 @@ Orders* OrdersList::getOrder(int elemIndex) {
 
 //Stream for whole list
 std::ostream& operator<<(std::ostream& os, const OrdersList& copied) {
-	unsigned listLength = copied.oList.size();
+	unsigned listLength = copied.oL.size();
 	for (unsigned i = 0; i < listLength; i++) {
-		os << i + 1 << " --> " << copied.oList[i]->getName() << " || ";
+		os << i + 1 << " --> " << copied.oL[i]->getName() << " || ";
 	}
 
 	os << "\n";
@@ -148,12 +148,12 @@ std::ostream& operator<<(std::ostream& os, const OrdersList& copied) {
 }
 
 std::vector<Orders*>* OrdersList::getOrdersList() {
-	return &this->oList;
+	return &this->oL;
 }
 
 // Actions
 
-Deploy::Deploy() : {}
+Deploy::Deploy() { Deploy::name = "Deploy"; }
 
 const std::string Deploy::name = "Deploy";
 std::string Deploy::getName() const {
@@ -185,7 +185,7 @@ Orders* Deploy::clone() const {
 Deploy::~Deploy() {
 }
 
-Advance::Advance() : {}
+Advance::Advance(){}
 
 const std::string Advance::name = "Advance";
 std::string Advance::getName() const {
@@ -217,7 +217,7 @@ Orders* Advance::clone() const {
 Advance::~Advance() {
 }
 
-Bomb::Bomb() : {}
+Bomb::Bomb(){}
 
 const std::string Bomb::name = "Bomb";
 std::string Bomb::getName() const {
@@ -249,7 +249,7 @@ Orders* Bomb::clone() const {
 Bomb::~Bomb() {
 }
 
-Blockade::Blockade() : {}
+Blockade::Blockade(){}
 
 const std::string Blockade::name = "Blockade";
 std::string Blockade::getName() const {
@@ -281,7 +281,7 @@ Orders* Blockade::clone() const {
 Blockade::~Blockade() {
 }
 
-Airlift::Airlift() : {}
+Airlift::Airlift(){}
 
 const std::string Airlift::name = "Airlift";
 std::string Airlift::getName() const {
@@ -313,7 +313,7 @@ Orders* Airlift::clone() const {
 Airlift::~Airlift() {
 }
 
-Negotiate::Negotiate() : {}
+Negotiate::Negotiate(){}
 
 const std::string Negotiate::name = "Negotiate";
 std::string Negotiate::getName() const {

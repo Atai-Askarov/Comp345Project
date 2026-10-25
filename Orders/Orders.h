@@ -1,7 +1,8 @@
 #ifndef ORDERS_H
 #define ORDERS_H
 
-#include <iosfwd>
+#include <iostream>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -82,10 +83,10 @@ private:
 	friend std::ostream& operator<<(std::ostream&, const OrdersList&);
 };
 
-class deploy : public Orders {
+class Deploy : public Orders {
 public:
-	deploy();
-	~deploy() override;
+	Deploy();
+	~Deploy() override;
 	std::string getName() const override;
 	bool validate() const override;
 	void execute() override;
@@ -96,10 +97,10 @@ private:
 	std::ostream& print(std::ostream&) const override;
 };
 
-class advance : public Orders {
+class Advance : public Orders {
 public:
-	advance();
-	~advance() override;
+	Advance();
+	~Advance() override;
 	std::string getName() const override;
 	bool validate() const override;
 	void execute() override;
@@ -110,10 +111,10 @@ private:
 	std::ostream& print(std::ostream&) const override;
 };
 
-class bomb : public Orders {
+class Bomb : public Orders {
 public:
-	bomb();
-	~bomb() override;
+	Bomb();
+	~Bomb() override;
 	std::string getName() const override;
 	bool validate() const override;
 	void execute() override;
@@ -124,10 +125,10 @@ private:
 	std::ostream& print(std::ostream&) const override;
 };
 
-class blockade : public Orders {
+class Blockade : public Orders {
 public:
-	blockade();
-	~blockade() override;
+	Blockade();
+	~Blockade() override;
 	std::string getName() const override;
 	bool validate() const override;
 	void execute() override;
@@ -138,10 +139,10 @@ private:
 	std::ostream& print(std::ostream&) const override;
 };
 
-class airlift : public Orders {
+class Airlift : public Orders {
 public:
-	airlift();
-	~airlift() override;
+	Airlift();
+	~Airlift() override;
 	std::string getName() const override;
 	bool validate() const override;
 	void execute() override;
@@ -152,10 +153,10 @@ private:
 	std::ostream& print(std::ostream&) const override;
 };
 
-class negotiate : public Orders {
+class Negotiate : public Orders {
 public:
-	negotiate();
-	~negotiate() override;
+	Negotiate();
+	~Negotiate() override;
 	std::string getName() const override;
 	bool validate() const override;
 	void execute() override;
