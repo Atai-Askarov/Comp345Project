@@ -24,6 +24,7 @@ void testLoadMaps(const std::vector<std::string>& paths) {
 
         if (map->validate()) {
             std::cout << name << ": valid\n";
+            std::cout << *map << "\n";
         }
         else {
             std::cout << name << ": invalid\n";
@@ -51,7 +52,10 @@ int main(int argc, char* argv[]) {
             assets + "/spain/spain.map",
             assets + "/sudamerica/sudamerica.map",
             assets + "/sw_baltic/sw_baltic.map",
-            assets + "/us_map/us.map"
+            assets + "/us_map/us.map",
+            assets + "/disconnected.map",
+            assets + "/random.txt",
+            assets + "/random.pdf"
         };
     }
     testLoadMaps(paths);

@@ -38,6 +38,8 @@ Continent& Continent::operator=(const Continent& other) {
     return *this;
 }
 
+// Getters and Setters
+
 std::string Continent::getName() const {
     return name;
 }
