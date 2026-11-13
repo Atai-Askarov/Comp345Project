@@ -146,8 +146,8 @@ int main() {
                 --remaining;
             }
         }
-        cout << "Borders are taken from the map; no extra connections are added.\n";
-        cout << "Unassigned territories remain unowned and can also be attack targets.\n";
+        cout << "Borders are taken from the map \n";
+
 
         cout << "\n=== 3. Assign Cards ===\n";
         CardType types[] = {CardType::Bomb, CardType::Reinforcement,
@@ -178,6 +178,8 @@ int main() {
 
         cout << "=== 6. Copy Constructor ===\n";
         cout << "Creating Player 3 as a copy of " << player1.getName() << "...\n";
+
+        //copy
         Player player3(player1);
         cout << "Player 3: " << player3.getName() << '\n';
         cout << "Cards: ";
@@ -194,6 +196,8 @@ int main() {
         // Assignment replaces this list, even for territories Player 2 owns.
         // Save it so we can restore its original ownership records afterward.
         vector<Territory*> originalTerritories = player2.toDefend();
+
+        //assignement
         player2 = player1;
         // These territories still name player2 as owner. Re-registering them
         // repairs its list without transferring any of player1's territories.

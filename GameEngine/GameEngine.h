@@ -6,6 +6,9 @@
 #include <vector>
 
 class State;
+class Map;
+class Player;
+class Deck;
 
 /**
  * A Transition is a directed edge of the game's state graph.
@@ -130,12 +133,43 @@ public:
     /** Returns true once the game has reached its final state. */
     bool isFinished() const;
 
+    // Part 2 supplies live objects and its already randomized player order.
+    // All gameplay objects are borrowed; copies share them, while copying the
+    // roster container and state graph. Never run copied engines concurrently.
+    void setGameContext(Map* map, const std::vector<Player*>& players, Deck* deck = nullptr);
+    Map* getMap() const;
+    Deck* getDeck() const;
+    const std::vector<Player*>& getActivePlayers() const;
+    Player* getWinner() const;
+
+    // Automatic gameplay phases. No startup, replay/quit or concrete order
+    // effects are implemented here. maxTurns=0 means play until victory;
+    // a positive diagnostic limit throws rather than declaring a false winner.
+    void mainGameLoop(size_t maxTurns = 0);
+    void reinforcementPhase();
+    void issueOrdersPhase();
+    void executeOrdersPhase();
+    void eliminatePlayers();
+    Player* checkVictory();
+
+    // Central state-change hook for Part 5 notification integration. Automatic
+    // phases select states directly; processCommand still validates graph edges.
+    void transition(const std::string& stateName);
+
     /** Stream insertion: prints the current state and the whole state graph. */
     friend std::ostream& operator<<(std::ostream& out, const GameEngine& engine);
 
 private:
     std::vector<State*> states; // Every state of the game (owned)
     State* currentState;        // State the game is currently in (not owned separately)
+    Map* gameMap;               // Borrowed; must outlive the engine's gameplay use
+    Deck* gameDeck;             // Borrowed; owns cards returned by players
+    std::vector<Player*> activePlayers; // Container owned; Player objects borrowed
+    Player* winner;             // Borrowed; retained players must outlive pending orders
+
+    // Reject missing context and count authoritative map ownership.
+    void requireGameContext() const;
+    size_t ownedTerritories(const Player* player) const;
 
     /** Creates the states and transitions of the assignment's state diagram. */
     void buildStateGraph();
