@@ -13,6 +13,7 @@ using namespace std;
 class Territory;
 class Hand;
 class OrdersList;
+class Deck;
 
 // A Player is the general's command folder: territories, cards, and orders.
 class Player {
@@ -52,6 +53,14 @@ public:
     // Types: deploy, advance, bomb, blockade, airlift, negotiate (lowercase).
     void issueOrder(const string& orderType = "deploy");
 
+    // Part 3: issue at most one order; false means finished this phase.
+    // The engine owns these two per-turn counters. The legacy overload above
+    // is unchanged. Order targets/counts await Part 4's parameterized orders.
+    bool issueOrder(Deck* deck, int& armiesToDeploy, int& nextOrder);
+    int getReinforcementPool() const;
+    void addReinforcements(int armies);
+    void spendReinforcements(int armies);
+
     friend ostream& operator<<(ostream& out, const Player& player);
 
 private:
@@ -66,6 +75,7 @@ private:
     // The caller must keep these objects alive while Player uses them.
     Hand* hand;
     OrdersList* orders;
+    int reinforcementPool = 0;
 };
 
 #endif

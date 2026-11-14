@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <stdexcept>
 
 namespace {
 
@@ -273,4 +274,122 @@ std::ostream& operator<<(std::ostream& out, const GameEngine& engine) {
         out << *state << "\n";
     }
     return out;
+}
+
+// Part 5 supplies transition(); do not bypass its future logging mechanism.
+void GameEngine::enterPlayState(const std::string& name) {
+    for (State* state : states) {
+        if (state->getName() == name) { transition(state); return; }
+    }
+    throw std::logic_error("Unknown gameplay state.");
+}
+
+void GameEngine::reinforcementPhase(const Map& gameMap, const std::vector<Player*>& activePlayers) {
+    enterPlayState("assign reinforcement");
+    for (Player* player : activePlayers) {
+        const auto& territories = gameMap.getCountries();
+        const int owned = static_cast<int>(std::count_if(territories.begin(), territories.end(),
+            [player](Territory* t) { return t->getOwner() == player; }));
+        if (owned == 0) continue;
+        int award = std::max(3, owned / 3);
+        for (Continent* continent : gameMap.getContinents()) {
+            const auto& members = continent->getTerritories();
+            if (!members.empty() && std::all_of(members.begin(), members.end(),
+                    [player](Territory* t) { return t->getOwner() == player; }))
+                award += continent->getBonus();
+        }
+        player->addReinforcements(award);
+    }
+}
+
+void GameEngine::issueOrdersPhase(const std::vector<Player*>& activePlayers, Deck* gameDeck) {
+    // Never silently reset reservations while old orders are still pending.
+    for (size_t i = 0; i < activePlayers.size(); ++i) {
+        OrdersList* list = activePlayers[i]->getOrdersList();
+        if (!list || list->getOrdersListSize() != 0)
+            throw std::logic_error("Each active player needs an empty OrdersList.");
+        for (size_t j = 0; j < i; ++j)
+            if (list == activePlayers[j]->getOrdersList())
+                throw std::logic_error("Active players must have separate order lists.");
+    }
+    enterPlayState("issue orders");
+    std::vector<int> remainingArmies, nextOrder(activePlayers.size(), 0);
+    for (Player* player : activePlayers) remainingArmies.push_back(player->getReinforcementPool());
+    std::vector<bool> finished(activePlayers.size(), false);
+    size_t remaining = activePlayers.size();
+    while (remaining > 0) {
+        for (size_t i = 0; i < activePlayers.size(); ++i) {
+            if (!finished[i] && !activePlayers[i]->issueOrder(gameDeck, remainingArmies[i], nextOrder[i])) {
+                finished[i] = true;
+                --remaining;
+            }
+        }
+    }
+}
+
+void GameEngine::executeOrdersPhase(const Map& gameMap, std::vector<Player*>& activePlayers) {
+    if (checkVictory(gameMap, activePlayers)) return;
+    enterPlayState("execute orders");
+    // One matching order per player per sweep. Pass 0 selects Deploy even if
+    // it was moved behind another type; pass 1 consumes the remaining fronts.
+    for (int pass = 0; pass < 2; ++pass) {
+        bool executed;
+        do {
+            executed = false;
+            for (Player* player : activePlayers) {
+                OrdersList* list = player->getOrdersList();
+                if (!list) throw std::logic_error("Active player has no OrdersList.");
+                for (size_t i = 0; i < list->getOrdersListSize(); ++i) {
+                    Orders* order = list->getOrder(static_cast<int>(i));
+                    if (pass == 0 && order->getName() != "Deploy") continue;
+                    std::cout << player->getName() << " executes " << order->getName() << '\n';
+                    order->execute(); // Part 4 performs validation and effects.
+                    list->remove(static_cast<int>(i)); // Deletes the order.
+                    if (checkVictory(gameMap, activePlayers)) {
+                        eliminatePlayers(gameMap, activePlayers);
+                        return;
+                    }
+                    executed = true;
+                    break;
+                }
+            }
+        } while (executed);
+    }
+    eliminatePlayers(gameMap, activePlayers);
+    enterPlayState("assign reinforcement");
+}
+
+void GameEngine::eliminatePlayers(const Map& gameMap, std::vector<Player*>& activePlayers) {
+    const auto& territories = gameMap.getCountries();
+    activePlayers.erase(std::remove_if(activePlayers.begin(), activePlayers.end(), [&](Player* player) {
+        return std::none_of(territories.begin(), territories.end(),
+            [player](Territory* t) { return t->getOwner() == player; });
+    }), activePlayers.end()); // Erase participation only, never delete Player.
+}
+
+Player* GameEngine::checkVictory(const Map& gameMap, const std::vector<Player*>& activePlayers) {
+    const auto& territories = gameMap.getCountries();
+    if (territories.empty()) return nullptr;
+    Player* winner = territories.front()->getOwner();
+    if (!winner || std::find(activePlayers.begin(), activePlayers.end(), winner) == activePlayers.end()) return nullptr;
+    if (!std::all_of(territories.begin(), territories.end(),
+            [winner](Territory* t) { return t->getOwner() == winner; })) return nullptr;
+    if (getCurrentStateName() != "win") {
+        enterPlayState("win");
+        std::cout << "Winner: " << winner->getName() << '\n';
+    }
+    return winner;
+}
+
+void GameEngine::mainGameLoop(const Map& gameMap, std::vector<Player*>& activePlayers, Deck* gameDeck) {
+    if (gameMap.getCountries().empty()) throw std::logic_error("Cannot play an empty map.");
+    eliminatePlayers(gameMap, activePlayers);
+    if (activePlayers.empty()) throw std::logic_error("No active players own territories.");
+    // Do not run a full game with the current no-effect Part 4 placeholders.
+    // There is deliberately no turn limit or artificial victory condition.
+    while (!checkVictory(gameMap, activePlayers)) {
+        reinforcementPhase(gameMap, activePlayers);
+        issueOrdersPhase(activePlayers, gameDeck);
+        executeOrdersPhase(gameMap, activePlayers);
+    }
 }
