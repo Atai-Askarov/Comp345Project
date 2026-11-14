@@ -5,6 +5,13 @@
 #include <string>
 #include <vector>
 
+
+#include "LoggingObserver.h"
+#include "CommandProcessing.h"
+#include "Map.h"
+#include "Player.h"
+#include "Cards.h"
+
 class State;
 
 /**
@@ -97,10 +104,16 @@ private:
  * Commands that match an outgoing transition of the current state move the
  * engine to the next state; any other command is rejected.
  */
-class GameEngine {
+
+    // INHERITING FROM SUBJECT AND ILOGGABLE CLASSES FOR GAME LOGGING
+class GameEngine: public Subject, public ILoggable {
 public:
     /** Builds the state graph and places the engine in the "start" state. */
     GameEngine();
+
+    // CONSTRUCTOR ACCEPTING COMMANDPROCESSOR
+    explicit GameEngine(CommandProcessor* processor);
+
 
     /** Copy constructor. Deep copies the whole state graph and the current state. */
     GameEngine(const GameEngine& other);
@@ -118,6 +131,15 @@ public:
      */
     bool processCommand(const std::string& command);
 
+
+    /// TRANSITIONS STATE THAT NOTIFIES LOGOBSERVER
+    // IMPLEMENTS STARTUP PHASE AND STRING IF STATE TRANSITIONS
+    void transition(State* newState);
+    void startupPhase();
+    std::string stringToLog() const override;
+
+
+
     /** Returns the current state. */
     const State* getCurrentState() const;
 
@@ -130,12 +152,31 @@ public:
     /** Returns true once the game has reached its final state. */
     bool isFinished() const;
 
+
+    // GETTERS AND SETTERS FOR THE STARTUP COMPONENTS
+    Map* getMap() const;
+    Deck* getDeck() const;
+    std::vector<Player*>* getPlayers() const;
+    CommandProcessor* getCommandProcessor() const;
+    void setCommandProcessor(CommandProcessor* processor);
+
+
     /** Stream insertion: prints the current state and the whole state graph. */
     friend std::ostream& operator<<(std::ostream& out, const GameEngine& engine);
 
 private:
     std::vector<State*> states; // Every state of the game (owned)
     State* currentState;        // State the game is currently in (not owned separately)
+
+
+    // USER-DEFINED DATA MEMBERS ARE POINTERS
+    Map* map;
+    Deck* deck;
+    std::vector<Player*>* players;
+    CommandProcessor* commandProcessor;
+    bool ownsCommandProcessor;
+
+
 
     /** Creates the states and transitions of the assignment's state diagram. */
     void buildStateGraph();
@@ -148,6 +189,16 @@ private:
 
     /** Deletes all states and resets the current state. */
     void clear();
+
+
+// HELPER METHODS TO HANDLE STARTUP PHASE COMMANDS AND RETURN EFFECTS
+    bool handleLoadMap(const std::string& filename, std::string& effectOut);
+    bool handleValidateMap(std::string& effectOut);
+    bool handleAddPlayer(const std::string& playerName, std::string& effectOut);
+    bool handleGameStart(std::string& effectOut);
 };
+
+//free function driver
+void startupPhaseDriver();
 
 #endif
