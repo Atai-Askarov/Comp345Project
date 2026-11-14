@@ -189,7 +189,7 @@ void GameEngine::buildStateGraph() {
     mapLoaded->addTransition("validatemap", mapValidated);
     mapValidated->addTransition("addplayer", playersAdded);
     playersAdded->addTransition("addplayer", playersAdded);
-    playersAdded->addTransition("assigncountries", assignReinforcement);
+    playersAdded->addTransition("gamestart", assignReinforcement);
 
     // Play phase
     assignReinforcement->addTransition("issueorder", issueOrders);
@@ -198,8 +198,8 @@ void GameEngine::buildStateGraph() {
     executeOrders->addTransition("execorder", executeOrders);
     executeOrders->addTransition("endexecorders", assignReinforcement);
     executeOrders->addTransition("win", win);
-    win->addTransition("play", start);
-    win->addTransition("end", exitState);
+    win->addTransition("replay", start);
+    win->addTransition("quit", exitState);
 
     currentState = start;
 }
