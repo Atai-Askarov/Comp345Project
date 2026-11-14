@@ -7,7 +7,7 @@
  * Console driver for the GameEngine. The user types commands that trigger
  * state transitions as depicted in the assignment's state diagram.
  * Invalid commands are rejected with an error message and do not change the state.
- * The program ends when the "end" command is entered in the "win" state.
+ * The program ends when the "quit" command is entered in the "win" state.
  */
 int main() {
     GameEngine engine;
