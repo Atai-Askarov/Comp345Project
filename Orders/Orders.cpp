@@ -162,12 +162,18 @@ std::ostream& Deploy::print(std::ostream& os) const {
 
 bool Deploy::validate() const {
 	std::cout << "Validating Deploy order..." << std::endl;
-	std::cout << "TO BE IMPLEMENTED" << std::endl;
 	if (currentPlayer != target->getOwner()) {
 		std::cout << "You do not possess the territory you are trying to deploy to." << std::endl;
 		return false;
 	}
-	// else if (amount > ) {}             ---- no reinforcementPool variable?
+	else if (amount > currentPlayer->getReinforcementPool()) {
+		std::cout << "You do not have this many armies in your reinforcement pool." << std::endl;
+		return false;
+	}
+	else if (amount < 1 ){
+		std::cout << "Please deploy a positive amount of armies." << std::endl;
+		return false;
+	}
 	else {
 		std::cout << "Deploy order validated successfully." << std::endl;
 		return true; // No invalid inputs
@@ -179,6 +185,7 @@ void Deploy::execute() {
 	if (validate()) {
 		std::cout << "Executing Deploy order..." << std::endl;
 		target->setArmies(target->getArmies() + amount);
+		currentPlayer->spendReinforcements(amount);
 		std::cout << "Deploy order executed successfully." << std::endl;
 		
 		notify(this);
@@ -228,9 +235,12 @@ void Advance::execute() {
 		else { // Moving on enemy territory; an attack
 			if (false) { // Placeholder for negotiation check
 				std::cout << "You can't target this player for an attack." << std::endl;
-				return;
 			}
-			attackSimulation(source, target, currentPlayer, amount);
+			else {
+				attackSimulation(source, target, currentPlayer, amount);
+			}
+
+			
 		}
 		std::cout << "Advance order executed successfully." << std::endl;
 		
@@ -285,11 +295,7 @@ void Advance::attackSimulation(Territory* simSource, Territory* simTarget, Playe
 
 	if (aliveAttackees == 0) { //Attack take territory
 		std::cout << simCurrentPlayer->getName() << " has successfully conquered " << simTarget->getName() << "!" << std::endl;
-		if (simTarget->getOwner() != nullptr){
-			simTarget->getOwner()->removeTerritory(*simTarget);
-			
-		}
-		simTarget->setOwner(simCurrentPlayer);
+		
 		simCurrentPlayer->addTerritory(*simTarget);
 		simTarget->setArmies(aliveAttackers);
 		
@@ -304,7 +310,6 @@ void Advance::attackSimulation(Territory* simSource, Territory* simTarget, Playe
 	})
 
 }
-//REMAKE territory ownership switch. addterritory method already handles it.
 
 
 Advance::~Advance() {
