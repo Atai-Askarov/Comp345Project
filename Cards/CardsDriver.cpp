@@ -4,11 +4,20 @@
 #include <cstdlib>
 #include <ctime>
 #include <iostream>
+#include "../Player/Player.h"
+#include "../Map/Map.h"
 
 
 // MAIN METHOD
 int main() {
     srand(static_cast<unsigned int>(time(0))); // random seed for card draws
+
+    Continent continent("Test", 0, "red");
+    Territory home(1, "Home", &continent), other(2, "Other", &continent), enemy(3, "Enemy", &continent);
+    Player player("Card player"), opponent("Opponent");
+    player.addTerritory(&home); player.addTerritory(&other); opponent.addTerritory(&enemy);
+    home.addNeighbour(&enemy);
+    home.setArmies(5); other.setArmies(5); enemy.setArmies(8);
 
 
     // welcome message
@@ -39,6 +48,8 @@ int main() {
     std::cout << "\n2. Creating an empty hand and empty orders list:" << std::endl;
     Hand* playerHand = new Hand(); //
     OrdersList* ordersList = new OrdersList(); // making new orders list
+    player.setHand(playerHand);
+    player.setOrdersList(ordersList);
     std::cout << *playerHand << std::endl; // print hand content
 
 
@@ -55,10 +66,10 @@ int main() {
 
 
     std::cout << "\n4. Playing every card in the hand safely:" << std::endl;
-    while (playerHand->getSize() > 0) {
-        Card* cardToPlay = playerHand->getCards()->front(); 
-        // play() will internally remove it from hand, add a new copy to deck, and free memory safely
-        cardToPlay->play(*playerHand, *gameDeck, *ordersList); 
+    const auto drawnCards = *playerHand->getCards();
+    for (Card* cardToPlay : drawnCards) {
+        if (!cardToPlay->play(*playerHand, *gameDeck, *ordersList, player))
+            std::cout << "Kept " << cardToPlay->getTypeAsString() << ": no eligible target or defined reinforcement rule.\n";
     }
 
 
@@ -68,8 +79,10 @@ int main() {
     std::cout << *playerHand;
     std::cout << "Deck size after plays: " << gameDeck->getSize() << std::endl; // getting deck size after plays
 
-    if (playerHand->getSize() == 0 && gameDeck->getSize() == 15) { // conditional to check
-        std::cout << "CHECKED: hand is empty deck has 15 cards." << std::endl; 
+    const bool verified = playerHand->getSize() + gameDeck->getSize() == 15
+        && ordersList->getOrdersListSize() == static_cast<size_t>(5 - playerHand->getSize());
+    if (verified) {
+        std::cout << "CHECKED: all 15 cards accounted for; one order per played card." << std::endl;
     } else {
         std::cout << "CHECKED FAILED." << std::endl; // invalid hand is not empty 
     }
@@ -95,6 +108,8 @@ int main() {
 
 
     // clean up memory
+    player.setHand(nullptr);
+    player.setOrdersList(nullptr);
     delete gameDeck;
     delete playerHand;
     delete copiedHand;
@@ -105,6 +120,6 @@ int main() {
 
     // finished message
     std::cout << "\nDemonstration finished successfully." << std::endl;
-    return 0;
+    return verified ? 0 : 1;
 }
 

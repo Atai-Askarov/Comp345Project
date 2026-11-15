@@ -372,9 +372,7 @@ Orders* Blockade::clone() const {
 Blockade::~Blockade() {
 }
 
-Airlift::Airlift() : currentPlayer(nullptr), source(nullptr), target(nullptr), amount(0), name("Airlift") {}
-
-Airlift::Airlift(Player* player, Territory* src, Territory* tgt, int qty) : currentPlayer(player), source(src), target(tgt), amount(qty), name("Airlift") {}
+Airlift::Airlift(Player* player, Territory* src, Territory* tgt, int qty) : currentPlayer(player), source(src), target(tgt), amount(qty) name("Airlift") {}
 
 std::string Airlift::getName() const {
 	return name;
@@ -423,10 +421,16 @@ bool Negotiate::validate() const {
 }
 
 void Negotiate::execute() {
-    if (!validate()) { recordEffect("Invalid negotiation; no effect"); return; }
-    if (!areNegotiating(currentPlayer, targetPlayer)) negotiations.emplace_back(currentPlayer, targetPlayer);
-    recordEffect("Attacks prevented between " + currentPlayer->getName() + " and "
-                 + targetPlayer->getName());
+	if (validate()) {
+		std::cout << "Executing Negotiate order..." << std::endl;
+
+		// NEED A PLAYER ATTRIBUTE TO STORE NEGOTIATION STATUS
+
+		std::cout << "Negotiate order executed successfully." << std::endl;
+		
+		
+		notify(this);
+	}
 }
 
 Orders* Negotiate::clone() const {

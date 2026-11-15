@@ -4,6 +4,7 @@
 #include <iosfwd>
 #include <string>
 #include <vector>
+#include <map>
 
 // Use standard library names directly, such as string, vector, and cout.
 using namespace std;
@@ -54,8 +55,8 @@ public:
     void issueOrder(const string& orderType = "deploy");
 
     // Part 3: issue at most one order; false means finished this phase.
-    // The engine owns these two per-turn counters. The legacy overload above
-    // is unchanged. Order targets/counts await Part 4's parameterized orders.
+    // The engine owns these two per-turn counters. Deploy/Advance carry their
+    // selected parameters; only Deploy execution spends the real pool.
     bool issueOrder(Deck* deck, int& armiesToDeploy, int& nextOrder);
     int getReinforcementPool() const;
     void addReinforcements(int armies);
@@ -76,6 +77,9 @@ private:
     Hand* hand;
     OrdersList* orders;
     int reinforcementPool = 0;
+    // Owned per-issuing-phase reservations; Territory pointers are borrowed.
+    map<Territory*, int>* reservedArmies;
+    int availableArmies(Territory* territory) const;
 };
 
 #endif
