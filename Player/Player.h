@@ -54,8 +54,8 @@ public:
     void issueOrder(const string& orderType = "deploy");
 
     // Part 3: issue at most one order; false means finished this phase.
-    // The engine owns these two per-turn counters. The legacy overload above
-    // is unchanged. Order targets/counts await Part 4's parameterized orders.
+    // The engine owns these two per-turn counters. Deploy/Advance carry their
+    // selected parameters; only Deploy execution spends the real pool.
     bool issueOrder(Deck* deck, int& armiesToDeploy, int& nextOrder);
     int getReinforcementPool() const;
     void addReinforcements(int armies);

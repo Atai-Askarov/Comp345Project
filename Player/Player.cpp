@@ -156,17 +156,52 @@ void Player::issueOrder(const string& orderType) {
     }
     unique_ptr<Orders> order;
     if (orderType == "deploy") {
-        order = make_unique<Deploy>();
+        const auto defend = toDefend();
+        if (defend.empty()) throw logic_error("Deploy needs an owned territory.");
+        order = make_unique<Deploy>(this, defend.front(), getReinforcementPool());
     } else if (orderType == "advance") {
-        order = make_unique<Advance>();
+        for (Territory* source : toDefend()) {
+            if (source->getArmies() < 1) continue;
+            for (Territory* target : source->getNeighbours()) {
+                if (source == target) continue;
+                order = make_unique<Advance>(this, source, target, 1);
+                break;
+            }
+            if (order) break;
+        }
+        if (!order) throw logic_error("Advance needs an owned army and an adjacent target.");
     } else if (orderType == "bomb") {
-        order = make_unique<Bomb>();
+        for (Territory* target : toAttack()) {
+            if (!target->getOwner()) continue;
+            order = make_unique<Bomb>(this, target);
+            break;
+        }
+        if (!order) throw logic_error("Bomb needs an adjacent enemy territory.");
     } else if (orderType == "blockade") {
-        order = make_unique<Blockade>();
+        const auto defend = toDefend();
+        if (defend.empty()) throw logic_error("Blockade needs an owned territory.");
+        order = make_unique<Blockade>(this, defend.front());
     } else if (orderType == "airlift") {
-        order = make_unique<Airlift>();
+        const auto defend = toDefend();
+        for (Territory* source : defend) {
+            if (source->getArmies() < 1) continue;
+            for (Territory* target : defend) {
+                if (source == target) continue;
+                order = make_unique<Airlift>(this, source, target, 1);
+                break;
+            }
+            if (order) break;
+        }
+        if (!order) throw logic_error("Airlift needs two owned territories and an army to move.");
     } else if (orderType == "negotiate") {
-        order = make_unique<Negotiate>();
+        // No global roster is available here; choose an enemy known through
+        // adjacent territories rather than inventing a target player.
+        for (Territory* target : toAttack()) {
+            if (!target->getOwner()) continue;
+            order = make_unique<Negotiate>(this, target->getOwner());
+            break;
+        }
+        if (!order) throw logic_error("Negotiate needs a known enemy player.");
     } else {
         throw invalid_argument("Unknown order type: " + orderType);
     }
@@ -201,13 +236,16 @@ void Player::spendReinforcements(int armies) {
 }
 
 bool Player::issueOrder(Deck* deck, int& armiesToDeploy, int& nextOrder) {
+    if (!orders) throw logic_error("Attach an OrdersList before issuing an order.");
     const auto defend = toDefend();
     if (defend.empty()) return false;
     if (armiesToDeploy > 0) {
-        issueOrder("deploy");
+        auto order = make_unique<Deploy>(this, defend.front(), armiesToDeploy);
+        orders->add(order.get());
+        order.release(); // OrdersList owns it; no pool deduction during issuing.
         // Reserve for this phase; only execution may spend the real pool.
-        cout << getName() << " selects Deploy " << armiesToDeploy << " -> "
-             << defend.front()->getName() << " (Part 4 payload not yet available)\n";
+        cout << getName() << " queues Deploy " << armiesToDeploy << " -> "
+             << defend.front()->getName() << '\n';
         armiesToDeploy = 0;
         return true;
     }
@@ -220,11 +258,13 @@ bool Player::issueOrder(Deck* deck, int& armiesToDeploy, int& nextOrder) {
             for (Territory* target : targets) {
                 const auto& neighbours = source->getNeighbours();
                 if (source == target || find(neighbours.begin(), neighbours.end(), target) == neighbours.end()) continue;
-                issueOrder("advance");
+                auto order = make_unique<Advance>(this, source, target, 1);
+                orders->add(order.get());
+                order.release();
                 ++nextOrder;
-                cout << getName() << " selects " << (attack ? "attack" : "friendly")
+                cout << getName() << " queues " << (attack ? "attack" : "friendly")
                      << " Advance 1: " << source->getName() << " -> " << target->getName()
-                     << " (Part 4 payload not yet available)\n";
+                     << '\n';
                 return true;
             }
         }

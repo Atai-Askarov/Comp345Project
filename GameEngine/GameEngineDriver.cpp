@@ -63,8 +63,8 @@ int main()
     return 0;
 }
 
-/** Call separately once Parts 2/5 build. Existing startup main is unchanged.
- * Orders below are the real teammate classes, currently effect placeholders.
+/** Call separately after teammate compilation errors are resolved; main is unchanged.
+ * Checks real Deploy and friendly Advance effects, without simulating combat.
  * Ownership changes in case 6 are a fixture, not simulated combat.
  */
 void part3Driver()
@@ -116,16 +116,29 @@ void part3Driver()
     int remaining = a.getReinforcementPool(), nextOrder = 0;
     check(a.issueOrder(&deck, remaining, nextOrder) && remaining == 0);
     check(ordersA.getOrder(0)->getName() == "Deploy" && a.getReinforcementPool() == 11);
-    std::cout << "3. Friendly/enemy Advance selections; order payloads await Part 4\n";
+    std::cout << "3. Queue friendly/enemy Advance; execute Deploy and friendly movement\n";
     check(a.issueOrder(&deck, remaining, nextOrder) && ordersA.getOrder(1)->getName() == "Advance");
     check(a.issueOrder(&deck, remaining, nextOrder) && ordersA.getOrder(2)->getName() == "Advance");
+    // T1 was removed then restored above, so toDefend() now lists T2, T1.
+    Territory* deployTarget = a.toDefend().front();
+    Territory* friendlyTarget = a.toDefend()[1];
+    const int beforeDeploy = deployTarget->getArmies();
+    ordersA.getOrder(0)->execute();
+    check(deployTarget->getArmies() == beforeDeploy + 11 && a.getReinforcementPool() == 0);
+    ordersA.remove(0);
+    const int sourceBefore = deployTarget->getArmies();
+    const int targetBefore = friendlyTarget->getArmies();
+    ordersA.getOrder(0)->execute();
+    check(deployTarget->getArmies() == sourceBefore - 1 && friendlyTarget->getArmies() == targetBefore + 1);
+    ordersA.remove(0); // The enemy Advance remains queued; no fake conquest.
     std::cout << "4. Existing Bomb card play queues one order and returns the card\n";
     hand.addCard(new Card(CardType::Bomb));
-    check(a.issueOrder(&deck, remaining, nextOrder) && ordersA.getOrder(3)->getName() == "Bomb");
+    check(a.issueOrder(&deck, remaining, nextOrder) && ordersA.getOrder(1)->getName() == "Bomb");
     check(hand.getSize() == 0 && deck.getSize() == 1 && !a.issueOrder(&deck, remaining, nextOrder));
     while (ordersA.getOrdersListSize())
         ordersA.remove(0); // End isolated issuing case.
-    std::cout << "Round-robin issuing/execution; current order effects are placeholders\n";
+    std::cout << "Round-robin issuing/execution using teammate orders\n";
+    engine.reinforcementPhase(map, players); // Fresh pool after the executed Deploy.
     engine.issueOrdersPhase(players, &deck);
     ordersA.move(0, 1); // Deploy must execute first even behind an Advance.
     engine.executeOrdersPhase(map, players);
