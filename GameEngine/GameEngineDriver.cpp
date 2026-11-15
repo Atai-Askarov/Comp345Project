@@ -9,7 +9,8 @@
  * runs the GameEngine startup phase, allowing the user to enter commands
  * to load a map, validate it, add players, and start the game.
  */
-void startupPhaseDriver() {
+void startupPhaseDriver()
+{
     std::cout << "=========================================\n"
               << "   Part 2: Game Startup Phase Driver\n"
               << "=========================================\n"
@@ -23,7 +24,8 @@ void startupPhaseDriver() {
     LogObserver logObserver;
     GameEngine engine;
     engine.attach(&logObserver);
-    if (engine.getCommandProcessor() != nullptr) {
+    if (engine.getCommandProcessor() != nullptr)
+    {
         engine.getCommandProcessor()->attach(&logObserver);
     }
 
@@ -33,36 +35,42 @@ void startupPhaseDriver() {
     std::cout << "Current Engine State: [" << engine.getCurrentStateName() << "]\n";
 
     // prints the players in turn order and their reinforcement pools, as well as the remaining deck size
-    if (engine.getPlayers() != nullptr) {
+    if (engine.getPlayers() != nullptr)
+    {
         std::cout << "Players in turn order (" << engine.getPlayers()->size() << "):\n";
-        for (size_t i = 0; i < engine.getPlayers()->size(); ++i) {
-            Player* p = (*engine.getPlayers())[i];
+        for (size_t i = 0; i < engine.getPlayers()->size(); ++i)
+        {
+            Player *p = (*engine.getPlayers())[i];
             std::cout << "  Turn " << (i + 1) << " -> " << *p
                       << " (Reinforcement Pool: " << p->getReinforcementPool() << ")\n";
-            if (p->getHand() != nullptr) {
+            if (p->getHand() != nullptr)
+            {
                 std::cout << "    " << *(p->getHand());
             }
         }
     }
 
-    if (engine.getDeck() != nullptr) {
+    if (engine.getDeck() != nullptr)
+    {
         std::cout << "Remaining Deck Size: " << engine.getDeck()->getSize() << " cards\n";
     }
 
     engine.detach(&logObserver);
-    if (engine.getCommandProcessor() != nullptr) {
+    if (engine.getCommandProcessor() != nullptr)
+    {
         engine.getCommandProcessor()->detach(&logObserver);
     }
 }
 
 /**
-* Console driver for the GameEngine. The user types commands that trigger
+ * Console driver for the GameEngine. The user types commands that trigger
  * state transitions as depicted in the assignment's state diagram.
  * Invalid commands are rejected with an error message and do not change the state.
  * The program ends when the "quit" command is entered in the "win" state.
  */
 
-int main() {
+int main()
+{
     // run the startup phase driver to demonstrate the GameEngine's functionality
     startupPhaseDriver();
 
@@ -73,9 +81,12 @@ int main() {
  * Orders below are the real teammate classes, currently effect placeholders.
  * Ownership changes in case 6 are a fixture, not simulated combat.
  */
-void part3Driver() {
-    auto check = [](bool condition) {
-        if (!condition) throw std::logic_error("Part 3 demonstration failed.");
+void part3Driver()
+{
+    auto check = [](bool condition)
+    {
+        if (!condition)
+            throw std::logic_error("Part 3 demonstration failed.");
     };
     Map map;
     Deck deck;
@@ -83,22 +94,29 @@ void part3Driver() {
     OrdersList ordersA, ordersB, ordersC;
     Player a("Alice"), b("Bob"), c("Carol");
     a.setHand(&hand);
-    a.setOrdersList(&ordersA); b.setOrdersList(&ordersB); c.setOrdersList(&ordersC);
-    auto* small = new Continent("Small", 5, "red");
-    auto* large = new Continent("Large", 0, "blue");
-    map.addContinent(small); map.addContinent(large);
-    for (int i = 0; i < 13; ++i) {
-        Continent* group = i < 2 ? small : large;
-        auto* t = new Territory(i + 1, "T" + std::to_string(i + 1), group);
-        map.addCountry(t); group->addTerritory(t);
+    a.setOrdersList(&ordersA);
+    b.setOrdersList(&ordersB);
+    c.setOrdersList(&ordersC);
+    auto *small = new Continent("Small", 5, "red");
+    auto *large = new Continent("Large", 0, "blue");
+    map.addContinent(small);
+    map.addContinent(large);
+    for (int i = 0; i < 13; ++i)
+    {
+        Continent *group = i < 2 ? small : large;
+        auto *t = new Territory(i + 1, "T" + std::to_string(i + 1), group);
+        map.addCountry(t);
+        group->addTerritory(t);
         (i < 2 ? a : b).addTerritory(t);
         t->setArmies(2);
-        if (i > 0) {
-            Territory* previous = map.getCountries()[i - 1];
-            previous->addNeighbour(t); t->addNeighbour(previous);
+        if (i > 0)
+        {
+            Territory *previous = map.getCountries()[i - 1];
+            previous->addNeighbour(t);
+            t->addNeighbour(previous);
         }
     }
-    std::vector<Player*> players{&a, &b, &c};
+    std::vector<Player *> players{&a, &b, &c};
     GameEngine engine;
     std::cout << "1. Reinforcement: 2 territories + bonus 5 = 8; 11 territories = 3\n";
     engine.reinforcementPhase(map, players);
@@ -119,7 +137,8 @@ void part3Driver() {
     hand.addCard(new Card(CardType::Bomb));
     check(a.issueOrder(&deck, remaining, nextOrder) && ordersA.getOrder(3)->getName() == "Bomb");
     check(hand.getSize() == 0 && deck.getSize() == 1 && !a.issueOrder(&deck, remaining, nextOrder));
-    while (ordersA.getOrdersListSize()) ordersA.remove(0); // End isolated issuing case.
+    while (ordersA.getOrdersListSize())
+        ordersA.remove(0); // End isolated issuing case.
     std::cout << "Round-robin issuing/execution; current order effects are placeholders\n";
     engine.issueOrdersPhase(players, &deck);
     ordersA.move(0, 1); // Deploy must execute first even behind an Advance.
@@ -132,7 +151,8 @@ void part3Driver() {
     check(players.size() == 2 && players[0] == &a && players[1] == &b && c.getName() == "Carol");
     std::cout << "6. Controlled ownership fixture, NOT a conquest test\n";
     check(!engine.checkVictory(map, players));
-    for (size_t i = 0; i + 1 < map.getCountries().size(); ++i) a.addTerritory(map.getCountries()[i]);
+    for (size_t i = 0; i + 1 < map.getCountries().size(); ++i)
+        a.addTerritory(map.getCountries()[i]);
     b.removeTerritory(map.getCountries().back());
     engine.eliminatePlayers(map, players);
     check(!engine.checkVictory(map, players)); // One active player is insufficient.
