@@ -160,6 +160,15 @@ public:
     CommandProcessor* getCommandProcessor() const;
     void setCommandProcessor(CommandProcessor* processor);
 
+    // Part 3 takes explicit startup context; does not change startup ownership
+    // or constructors. Players/Map/Deck remain owned by their original owners.
+    void reinforcementPhase(const Map& gameMap, const std::vector<Player*>& activePlayers);
+    void issueOrdersPhase(const std::vector<Player*>& activePlayers, Deck* gameDeck);
+    void executeOrdersPhase(const Map& gameMap, std::vector<Player*>& activePlayers);
+    void eliminatePlayers(const Map& gameMap, std::vector<Player*>& activePlayers);
+    Player* checkVictory(const Map& gameMap, const std::vector<Player*>& activePlayers);
+    void mainGameLoop(const Map& gameMap, std::vector<Player*>& activePlayers, Deck* gameDeck);
+
 
     /** Stream insertion: prints the current state and the whole state graph. */
     friend std::ostream& operator<<(std::ostream& out, const GameEngine& engine);
@@ -167,6 +176,9 @@ public:
 private:
     std::vector<State*> states; // Every state of the game (owned)
     State* currentState;        // State the game is currently in (not owned separately)
+
+    // Select an existing phase state through the teammate's transition hook.
+    void enterPlayState(const std::string& name);
 
 
     // USER-DEFINED DATA MEMBERS ARE POINTERS
@@ -200,5 +212,8 @@ private:
 
 //free function driver
 void startupPhaseDriver();
+
+// Callable separately; the existing startup driver and main stay unchanged.
+void part3Driver();
 
 #endif
