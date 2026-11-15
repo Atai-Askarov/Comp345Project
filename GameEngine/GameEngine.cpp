@@ -8,6 +8,7 @@
 #include <sstream>
 
 #include <filesystem>
+#include <system_error>
 
 namespace {
 
@@ -651,6 +652,7 @@ void GameEngine::setCommandProcessor(CommandProcessor *processor)
 }
 
 
+// START UP PHASE DRIVER
 void GameEngine::startupPhase()
 {
     if (commandProcessor == nullptr)

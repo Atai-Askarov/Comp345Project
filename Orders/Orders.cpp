@@ -4,10 +4,58 @@
 #include <memory>
 #include <stdexcept>
 #include <random>
+#include <limits>
+#include <utility>
 #include "Orders.h"
+#include "../Player/Player.h"
+#include "../Map/Map.h"
 
+namespace {
+// Turn state belongs here until the controller/Player provide a shared API.
+std::vector<std::pair<Player*, Player*>> negotiations;
+std::vector<Player*> conquerors;
+std::unique_ptr<Player> neutral;
 
-Orders::~Orders() {}
+bool areNegotiating(Player* first, Player* second) {
+    return std::any_of(negotiations.begin(), negotiations.end(), [=](const auto& pair) {
+        return (pair.first == first && pair.second == second)
+            || (pair.first == second && pair.second == first);
+    });
+}
+
+Player* neutralPlayer() {
+    if (!neutral) neutral = std::make_unique<Player>("Neutral");
+    return neutral.get();
+}
+} // namespace
+
+Orders::Orders() : effect(new std::string("Not executed")) {}
+Orders::Orders(const Orders& other) : Subject(other), effect(new std::string(*other.effect)) {}
+Orders& Orders::operator=(const Orders& other) {
+    if (this != &other) {
+        Subject::operator=(other);
+        *effect = *other.effect;
+    }
+    return *this;
+}
+Orders::~Orders() { delete effect; }
+
+void Orders::recordEffect(const std::string& text) {
+    *effect = text;
+    std::cout << getName() << ": " << text << '\n';
+    notify(this);
+}
+
+const std::vector<Player*>& Orders::getConquerors() { return conquerors; }
+void Orders::endTurn() { negotiations.clear(); conquerors.clear(); }
+void Orders::resetGameState() {
+    endTurn();
+    if (neutral) {
+        const auto territories = neutral->getTerritories();
+        for (Territory* territory : territories) neutral->removeTerritory(territory);
+        neutral.reset();
+    }
+}
 
 //Orders stream
 
@@ -16,7 +64,7 @@ std::ostream& operator<<(std::ostream& os, const Orders& order) {
 }
 
 std::string Orders::stringToLog() const {
-	return "Order Executed: " + getName();
+	return "Order Executed: " + getName() + " | " + *effect;
 }
 
 //OrdersList
@@ -56,7 +104,8 @@ void OrdersList::add(Orders* order) {
         throw std::invalid_argument("Order already belongs to this list.");
     }
     oL.push_back(order);
-    notify(this);
+    try { notify(this); }
+    catch (...) { oL.pop_back(); throw; } // Caller retains ownership on failure.
 }
 
 std::string OrdersList::stringToLog() const {
@@ -148,8 +197,9 @@ std::ostream& operator<<(std::ostream& os, const OrdersList& copied) {
 std::vector<Orders*>* OrdersList::getOrdersList() {
 	return &this->oL;
 }
-
 // Actions
+
+Deploy::Deploy() : currentPlayer(nullptr), target(nullptr), amount(0), name("Deploy") {}
 
 Deploy::Deploy(Player* player, Territory* terr, int qty) : currentPlayer(player), target(terr), amount(qty), name("Deploy") {}
 
@@ -162,35 +212,17 @@ std::ostream& Deploy::print(std::ostream& os) const {
 }
 
 bool Deploy::validate() const {
-	std::cout << "Validating Deploy order..." << std::endl;
-	if (currentPlayer != target->getOwner()) {
-		std::cout << "You do not possess the territory you are trying to deploy to." << std::endl;
-		return false;
-	}
-	else if (amount > currentPlayer->getReinforcementPool()) {
-		std::cout << "You do not have this many armies in your reinforcement pool." << std::endl;
-		return false;
-	}
-	else if (amount < 1 ){
-		std::cout << "Please deploy a positive amount of armies." << std::endl;
-		return false;
-	}
-	else {
-		std::cout << "Deploy order validated successfully." << std::endl;
-		return true; // No invalid inputs
-
-	}
+    return currentPlayer && target && target->getOwner() == currentPlayer
+        && amount > 0 && amount <= currentPlayer->getReinforcementPool()
+        && target->getArmies() >= 0
+        && amount <= std::numeric_limits<int>::max() - target->getArmies();
 }
 
 void Deploy::execute() {
-	if (validate()) {
-		std::cout << "Executing Deploy order..." << std::endl;
-		target->setArmies(target->getArmies() + amount);
-		currentPlayer->spendReinforcements(amount);
-		std::cout << "Deploy order executed successfully." << std::endl;
-		
-		notify(this);
-	}
+    if (!validate()) { recordEffect("Invalid deploy; no effect"); return; }
+    currentPlayer->spendReinforcements(amount);
+    target->setArmies(target->getArmies() + amount);
+    recordEffect("Deployed " + std::to_string(amount) + " armies to " + target->getName());
 }
 
 Orders* Deploy::clone() const {
@@ -199,6 +231,8 @@ Orders* Deploy::clone() const {
 
 Deploy::~Deploy() {
 }
+
+Advance::Advance() : currentPlayer(nullptr), source(nullptr), target(nullptr), amount(0), name("Advance") {}
 
 Advance::Advance(Player* player, Territory* src, Territory* tgt, int qty) : currentPlayer(player), source(src), target(tgt), amount(qty), name("Advance") {}
 
@@ -211,110 +245,67 @@ std::ostream& Advance::print(std::ostream& os) const {
 }
 
 bool Advance::validate() const {
-	std::cout << "Validating Advance order..." << std::endl;
-	if (source->getOwner() != currentPlayer) {
-		std::cout << "You do not own the source territory." << std::endl;
-		return false;
-	}
-	else if (std::find(source->getNeighbours()->begin(), source->getNeighbours()->end(), target) == source->getNeighbours()->end()) {
-		std::cout << "The target territory is not adjacent to the source territory." << std::endl;
-		return false;
-	}
-	else {
-		std::cout << "Advance order validated successfully." << std::endl;
-	return true; // No invalid inputs
-	}
+    if (!currentPlayer || !source || !target || source == target || amount <= 0
+            || source->getOwner() != currentPlayer || source->getArmies() < amount
+            || target->getArmies() < 0) return false;
+    const auto& neighbours = source->getNeighbours();
+    if (std::find(neighbours.begin(), neighbours.end(), target) == neighbours.end()) return false;
+    if (target->getOwner() == currentPlayer)
+        return amount <= std::numeric_limits<int>::max() - target->getArmies();
+    return !areNegotiating(currentPlayer, target->getOwner());
 }
 
 void Advance::execute() {
-	if (validate()) {
-		std::cout << "Executing Advance order..." << std::endl;
-		if (source->getOwner() == target->getOwner()) { // Simply moving armies across owned territories
-			source->setArmies(source->getArmies() - amount);
-			target->setArmies(target->getArmies() + amount);
-		}
-		else { // Moving on enemy territory; an attack
-			if (false) { // Placeholder for negotiation check
-				std::cout << "You can't target this player for an attack." << std::endl;
-			}
-			else {
-				attackSimulation(source, target, currentPlayer, amount);
-			}
-
-			
-		}
-		std::cout << "Advance order executed successfully." << std::endl;
-		
-		
-		notify(this);
-	}
+    if (!validate()) { recordEffect("Invalid advance; no effect"); return; }
+    if (target->getOwner() == currentPlayer) {
+        source->setArmies(source->getArmies() - amount);
+        target->setArmies(target->getArmies() + amount);
+        recordEffect("Moved " + std::to_string(amount) + " armies from "
+                     + source->getName() + " to " + target->getName());
+    } else {
+        attackSimulation(source, target, currentPlayer, amount);
+        recordEffect(std::string(target->getOwner() == currentPlayer ? "Conquered " : "Attack repelled at ")
+                     + target->getName() + "; source armies " + std::to_string(source->getArmies())
+                     + ", target armies " + std::to_string(target->getArmies()));
+    }
 }
 
 Orders* Advance::clone() const {
 	return new Advance(*this);
 }
 
-void Advance::attackSimulation(Territory* simSource, Territory* simTarget, Player* simCurrentPlayer, int simQty) {
-	int atkKills = 0;
-	int defKills = 0;
-	int aliveAttackers = 0;
-	int aliveAttackees = 0;
-
-	simSource->setArmies(simSource->getArmies() - simQty);
-
-	for (int i = 1; i <= simQty; i++) // Attackers sim
-	{
-
-		std::random_device dev;
-		std::mt19937 rng(dev());
-		std::uniform_int_distribution<std::mt19937::result_type> range(0, 100);
-
-		int roll = (int)range(rng) % 100 + 1;
-		if (roll <= 60)
-		{
-			atkKills++;
-		}
-	}
-
-	for (int i = 1; i <= simTarget->getArmies(); i++) // Attackee sim
-	{
-
-		std::random_device dev;
-		std::mt19937 rng(dev());
-		std::uniform_int_distribution<std::mt19937::result_type> range(0, 100);
-
-		int roll = (int)range(rng) % 100 + 1;
-
-		if (roll <= 70)
-		{
-			defKills++;
-		}
-	}
-
-	aliveAttackers = max(0, simQty - defKills);
-	aliveAttackees = max(0, simTarget->getArmies() - atkKills);
-
-	if (aliveAttackees == 0) { //Attack take territory
-		std::cout << simCurrentPlayer->getName() << " has successfully conquered " << simTarget->getName() << "!" << std::endl;
-		
-		simCurrentPlayer->addTerritory(*simTarget);
-		simTarget->setArmies(aliveAttackers);
-		
-		//Missing card for 1 conquered territory
-	}
-	else {
-		std::cout << simCurrentPlayer->getName() << " has failed to conquer " << simTarget->getName() << "!" << std::endl;
-		pSource->setArmies(pSource->getArmies() + remainingAttackArmies); // Attackers retreat
-		pTarget->setArmies(remainingDefendArmies);
-		simSource->setArmies(simSource->getArmies() + aliveAttackers); // Attackers retreat
-		simTarget->setArmies(aliveAttackees);
-	})
-
+void Advance::attackSimulation(Territory* simSource, Territory* simTarget, Player* simPlayer, int quantity) {
+    // Preserve the existing public helper, but reject invalid direct calls too.
+    Advance battle(simPlayer, simSource, simTarget, quantity);
+    if (!battle.validate() || simTarget->getOwner() == simPlayer) return;
+    static std::mt19937 random(std::random_device{}());
+    std::bernoulli_distribution attackerHit(0.60), defenderHit(0.70);
+    const int defenders = simTarget->getArmies();
+    int attackerKills = 0, defenderKills = 0;
+    // One simultaneous volley: defenders killed here still get their shots.
+    for (int i = 0; i < quantity; ++i) if (attackerHit(random)) ++attackerKills;
+    for (int i = 0; i < defenders; ++i) if (defenderHit(random)) ++defenderKills;
+    const int survivingAttackers = std::max(0, quantity - defenderKills);
+    const int survivingDefenders = std::max(0, defenders - attackerKills);
+    if (survivingDefenders == 0) {
+        // addTerritory updates both players' lists and the territory owner.
+        // The handout makes capture conditional on eliminating all defenders.
+        simPlayer->addTerritory(simTarget);
+        simSource->setArmies(simSource->getArmies() - quantity);
+        simTarget->setArmies(survivingAttackers);
+        if (std::find(conquerors.begin(), conquerors.end(), simPlayer) == conquerors.end())
+            conquerors.push_back(simPlayer);
+    } else {
+        // Surviving attackers retreat, preserving the teammate's original policy.
+        simSource->setArmies(simSource->getArmies() - quantity + survivingAttackers);
+        simTarget->setArmies(survivingDefenders);
+    }
 }
-
 
 Advance::~Advance() {
 }
+
+Bomb::Bomb() : currentPlayer(nullptr), target(nullptr), name("Bomb") {}
 
 Bomb::Bomb(Player* player, Territory* tgt) : currentPlayer(player), target(tgt), name("Bomb") {}
 
@@ -327,31 +318,20 @@ std::ostream& Bomb::print(std::ostream& os) const {
 }
 
 bool Bomb::validate() const {
-	std::cout << "Validating Bomb order..." << std::endl;
-	if (target->getOwner() == currentPlayer) {
-		std::cout << "You can't bomb your own territory." << std::endl;
-		return false;
-	}
-	for (auto const& terrVector : currentPlayer->getTerritories()) {
-		auto it = std::find(terrVecor->getNeighbours()->begin(), terrVector->getNeighbours()->end(), target->getName());
-		if (it != terrVector->getNeighbours()->end()) {
-			std::cout << "Bomb order validated successfully." << std::endl;
-			return true; // Valid if any of the player's territories are adjacent to the target
-		}
-	}
-	std::cout << "The target territory is not adjacent to any of your territories." << std::endl;
-	return false; 
+    if (!currentPlayer || !target || !target->getOwner()
+            || target->getOwner() == currentPlayer || target->getArmies() < 0
+            || areNegotiating(currentPlayer, target->getOwner())) return false;
+    for (Territory* owned : currentPlayer->toDefend()) {
+        const auto& neighbours = owned->getNeighbours();
+        if (std::find(neighbours.begin(), neighbours.end(), target) != neighbours.end()) return true;
+    }
+    return false;
 }
 
 void Bomb::execute() {
-	if (validate()) {
-		std::cout << "Executing Bomb order..." << std::endl;
-		target->setArmies(target->getArmies() / 2);
-		std::cout << "Bomb order executed successfully." << std::endl;
-		
-		
-		notify(this);
-	}
+    if (!validate()) { recordEffect("Invalid bomb; no effect"); return; }
+    target->setArmies(target->getArmies() / 2);
+    recordEffect("Bombed " + target->getName() + "; remaining armies " + std::to_string(target->getArmies()));
 }
 
 Orders* Bomb::clone() const {
@@ -360,6 +340,8 @@ Orders* Bomb::clone() const {
 
 Bomb::~Bomb() {
 }
+
+Blockade::Blockade() : currentPlayer(nullptr), target(nullptr), name("Blockade") {}
 
 Blockade::Blockade(Player* player, Territory* tgt) : currentPlayer(player), target(tgt), name("Blockade") {}
 
@@ -372,28 +354,15 @@ std::ostream& Blockade::print(std::ostream& os) const {
 }
 
 bool Blockade::validate() const {
-	std::cout << "Validating Blockade order..." << std::endl;
-	if (target->getOwner() != currentPlayer) {
-		std::cout << "You can't blockade a territory you don't own." << std::endl;
-		return false;
-	}
-	else {
-		std::cout << "Blockade order validated successfully." << std::endl;
-		return true; 
-	}
+    return currentPlayer && target && target->getOwner() == currentPlayer
+        && target->getArmies() >= 0 && target->getArmies() <= std::numeric_limits<int>::max() / 2;
 }
 
 void Blockade::execute() {
-	if (validate()) {
-		std::cout << "Executing Blockade order..." << std::endl;
-		target->setArmies(target->getArmies() * 2);
-		target->getOwner()->removeTerritory(*target); // Territory becomes neutral
-
-		std::cout << "Blockade order executed successfully." << std::endl;
-		
-		
-		notify(this);
-	}
+    if (!validate()) { recordEffect("Invalid blockade; no effect"); return; }
+    neutralPlayer()->addTerritory(target);
+    target->setArmies(target->getArmies() * 2);
+    recordEffect("Doubled armies on " + target->getName() + " and transferred ownership to Neutral");
 }
 
 Orders* Blockade::clone() const {
@@ -403,7 +372,9 @@ Orders* Blockade::clone() const {
 Blockade::~Blockade() {
 }
 
-Airlift::Airlift(Player* player, Territory* src, Territory* tgt, int qty) : currentPlayer(player), source(src), target(tgt), amount(qty) name("Airlift") {}
+Airlift::Airlift() : currentPlayer(nullptr), source(nullptr), target(nullptr), amount(0), name("Airlift") {}
+
+Airlift::Airlift(Player* player, Territory* src, Territory* tgt, int qty) : currentPlayer(player), source(src), target(tgt), amount(qty), name("Airlift") {}
 
 std::string Airlift::getName() const {
 	return name;
@@ -414,39 +385,18 @@ std::ostream& Airlift::print(std::ostream& os) const {
 }
 
 bool Airlift::validate() const {
-	std::cout << "Validating Airlift order..." << std::endl;
-	if (source->getOwner() != currentPlayer && target->getOwner() != currentPlayer) {
-		std::cout << "You can't airlift from or to territories that aren't owned by you." << std::endl;
-		return false;
-	}
-	else if (source == target) {
-		std::cout << "You can't airlift to the same territory." << std::endl;
-		return false;
-	}
-	else if (source->getArmies() < amount) {
-		std::cout << "You don't have this many armies to airlift." << std::endl;
-		return false;
-	}
-	else if (amount <= 0) {
-		std::cout << "You can't airlift a non-positive number of armies." << std::endl;
-		return false;
-	}
-	else {
-		std::cout << "Airlift order validated successfully." << std::endl;
-		return true; // No invalid inputs
-	}
+    return currentPlayer && source && target && source != target && amount > 0
+        && source->getOwner() == currentPlayer && target->getOwner() == currentPlayer
+        && source->getArmies() >= amount && target->getArmies() >= 0
+        && amount <= std::numeric_limits<int>::max() - target->getArmies();
 }
 
 void Airlift::execute() {
-	if (validate()) {
-		std::cout << "Executing Airlift order..." << std::endl;
-		source->setArmies(source->getArmies() - amount);
-		target->setArmies(target->getArmies() + amount);
-		
-		std::cout << "Airlift order executed successfully." << std::endl;
-		
-		notify(this);
-	}
+    if (!validate()) { recordEffect("Invalid airlift; no effect"); return; }
+    source->setArmies(source->getArmies() - amount);
+    target->setArmies(target->getArmies() + amount);
+    recordEffect("Airlifted " + std::to_string(amount) + " armies from "
+                 + source->getName() + " to " + target->getName());
 }
 
 Orders* Airlift::clone() const {
@@ -455,6 +405,8 @@ Orders* Airlift::clone() const {
 
 Airlift::~Airlift() {
 }
+
+Negotiate::Negotiate() : currentPlayer(nullptr), targetPlayer(nullptr), name("Negotiate") {}
 
 Negotiate::Negotiate(Player* player, Player* tPlayer) : currentPlayer(player), targetPlayer(tPlayer), name("Negotiate") {}
 
@@ -467,29 +419,14 @@ std::ostream& Negotiate::print(std::ostream& os) const {
 }
 
 bool Negotiate::validate() const {
-	std::cout << "Validating Negotiate order..." << std::endl;
-	if (targetPlayer == currentPlayer) {
-		std::cout << "You can't negotiate with yourself." << std::endl;
-		return false;
-
-	}
-	else {
-		std::cout << "Negotiate order validated successfully." << std::endl;
-		return true; // Placeholder
-	}
+    return currentPlayer && targetPlayer && currentPlayer != targetPlayer;
 }
 
 void Negotiate::execute() {
-	if (validate()) {
-		std::cout << "Executing Negotiate order..." << std::endl;
-
-		// NEED A PLAYER ATTRIBUTE TO STORE NEGOTIATION STATUS
-
-		std::cout << "Negotiate order executed successfully." << std::endl;
-		
-		
-		notify(this);
-	}
+    if (!validate()) { recordEffect("Invalid negotiation; no effect"); return; }
+    if (!areNegotiating(currentPlayer, targetPlayer)) negotiations.emplace_back(currentPlayer, targetPlayer);
+    recordEffect("Attacks prevented between " + currentPlayer->getName() + " and "
+                 + targetPlayer->getName());
 }
 
 Orders* Negotiate::clone() const {

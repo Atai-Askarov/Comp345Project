@@ -1,0 +1,9 @@
+validatemap
+loadmap nosuch.map
+loadmap spain.map
+validatemap
+addplayer Alice
+gamestart
+addplayer Bob
+addplayer Carol
+gamestart

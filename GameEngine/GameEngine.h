@@ -6,11 +6,11 @@
 #include <vector>
 
 
-#include "LoggingObserver.h"
-#include "CommandProcessing.h"
-#include "Map.h"
-#include "Player.h"
-#include "Cards.h"
+#include "../Logger/LoggingObserver.h"
+#include "../CommandProcessing/CommandProcessing.h"
+#include "../Map/Map.h"
+#include "../Player/Player.h"
+#include "../Cards/Cards.h"
 
 class State;
 

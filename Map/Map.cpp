@@ -467,6 +467,8 @@ Map* MapLoader::loadMap(const std::string& path) {
             }
             break;
         }
+                case DocumentSection::Ignore:
+            break; // sections such as [files] are skipped on purpose
         }
     }
 
