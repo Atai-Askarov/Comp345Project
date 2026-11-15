@@ -60,7 +60,7 @@ public:
 
 	OrdersList();
 	OrdersList(const OrdersList& ol);
-	//OrdersList(const string& user, const vector<Orders>& ol); -- might be useful later
+	
 	~OrdersList();
 
 	//Operator Overloading
@@ -75,7 +75,7 @@ public:
 	void remove(int elemIndex);
 	void move(int iniIndex, int newIndex);
 
-	//const vector<Orders*> remove(const string& order); -- removing per order type could be useful
+	
 
 	//Iterate through the list
 	void execute();

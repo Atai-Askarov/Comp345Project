@@ -386,8 +386,8 @@ void Blockade::execute() {
 	if (validate()) {
 		std::cout << "Executing Blockade order..." << std::endl;
 		target->setArmies(target->getArmies() * 2);
-		target->getOwner()->removeTerritory(*target);
-		target->setOwner(nullptr); // Territory becomes neutral
+		target->getOwner()->removeTerritory(*target); // Territory becomes neutral
+
 		std::cout << "Blockade order executed successfully." << std::endl;
 		
 		
