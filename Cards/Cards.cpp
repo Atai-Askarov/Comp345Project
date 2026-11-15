@@ -1,5 +1,6 @@
 // including guards
 #include "Cards.h"
+#include "../Player/Player.h"
 #include <cstdlib>
 #include <algorithm>
 #include <memory>
@@ -74,26 +75,31 @@ std::ostream& operator<<(std::ostream& os, const Card& card) {
 
 
 // play function
-void Card::play(Hand& hand, Deck& deck, OrdersList& ordersList) {
-    std::cout << "Playing card: " << getTypeAsString() << std::endl; // shows current playing card
-    std::unique_ptr<Orders> order;
+bool Card::play(Hand& hand, Deck& deck, OrdersList& ordersList, Player& player) {
+    if (player.getHand() != &hand || player.getOrdersList() != &ordersList
+            || std::find(hand.getCards()->begin(), hand.getCards()->end(), this) == hand.getCards()->end()) {
+        throw std::invalid_argument("Card must belong to the issuing player's attached hand.");
+    }
+    std::string orderType;
     switch (*type) {
-        case CardType::Bomb: order = std::make_unique<Bomb>(); break;
-        case CardType::Reinforcement: order = std::make_unique<Deploy>(); break;
-        case CardType::Blockade: order = std::make_unique<Blockade>(); break;
-        case CardType::Airlift: order = std::make_unique<Airlift>(); break;
-        case CardType::Diplomacy: order = std::make_unique<Negotiate>(); break;
+        case CardType::Bomb: orderType = "bomb"; break;
+        case CardType::Blockade: orderType = "blockade"; break;
+        case CardType::Airlift: orderType = "airlift"; break;
+        case CardType::Diplomacy: orderType = "negotiate"; break;
+        case CardType::Reinforcement:
+            // Neither supplied assignment defines this card's bonus/effect.
+            // Keep it in the hand until the team specifies the rule.
+            return false;
         default: throw std::invalid_argument("Unknown card type.");
     }
-    ordersList.add(order.get());
-    order.release(); // The list now owns the order.
-    
-    // create a fresh deep copy to put back into the deck pool
-    deck.addCard(new Card(*this));
-    
-    // delete card from player's hand and free the memory
-    hand.removeCard(this); 
-    delete this; 
+    const int index = static_cast<int>(ordersList.getOrdersListSize());
+    try { player.issueOrder(orderType); }
+    catch (const std::logic_error&) { return false; } // No target: keep the card.
+    try { deck.addCard(this); }
+    catch (...) { ordersList.remove(index); throw; }
+    hand.removeCard(this); // Ownership transfers to Deck; no copying or delete this.
+    std::cout << "Played " << getTypeAsString() << " card for " << player.getName() << '\n';
+    return true;
 }
 
 
@@ -154,8 +160,8 @@ void Deck::draw(Hand& hand) {
     }
     int randomIndex = rand() % cards->size(); // generate random index, use modulus to ensure index is within bounds
     Card* drawnCard = (*cards)[randomIndex]; // get the card of that specific index
-    cards->erase(cards->begin() + randomIndex); // remove the card from deck
     hand.addCard(drawnCard);
+    cards->erase(cards->begin() + randomIndex); // Transfer only after insertion succeeds.
 }
 
 

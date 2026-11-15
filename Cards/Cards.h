@@ -9,6 +9,7 @@
 // defining class
 class Deck;
 class Hand;
+class Player;
 
 // Share the real OrdersList with Player.
 #include "../Orders/Orders.h"
@@ -35,7 +36,10 @@ public:
     
     friend std::ostream& operator<<(std::ostream& os, const Card& card); // for printing thecard type
 
-    void play(Hand& hand, Deck& deck, OrdersList& ordersList); // play function
+    // Player supplies real order parameters. Returns false without consuming
+    // the card when no eligible target (or specified reinforcement rule) exists.
+    // On success the Deck owns this card; the caller must not delete it.
+    bool play(Hand& hand, Deck& deck, OrdersList& ordersList, Player& player);
     CardType getType() const;
     std::string getTypeAsString() const;
 

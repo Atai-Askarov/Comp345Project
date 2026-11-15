@@ -20,28 +20,32 @@ Player::Player() : Player("Unnamed player") {}
 // release() transfers responsibility for cleanup to Player's destructor.
 Player::Player(const string& playerName)
     : name(nullptr), territories(nullptr), attackTargets(nullptr),
-      hand(nullptr), orders(nullptr) {
+      hand(nullptr), orders(nullptr), reservedArmies(nullptr) {
     auto newName = make_unique<string>(playerName);
     auto newTerritories = make_unique<vector<Territory*>>();
     auto newTargets = make_unique<vector<Territory*>>();
+    auto newReservations = make_unique<map<Territory*, int>>();
     name = newName.release();
     territories = newTerritories.release();
     attackTargets = newTargets.release();
+    reservedArmies = newReservations.release();
 }
 
 // Copy the folder's lists, not the map's Territory objects.
 // All borrowed pointers remain shared; copying never changes territory owners.
 Player::Player(const Player& other)
     : name(nullptr), territories(nullptr), attackTargets(nullptr),
-      hand(nullptr), orders(nullptr) {
+      hand(nullptr), orders(nullptr), reservedArmies(nullptr) {
     // Keep ownership local until every allocation and copy succeeds.
     // If any copy throws, these smart pointers release all partial state.
     auto newName = make_unique<string>(*other.name);
     auto newTerritories = make_unique<vector<Territory*>>(*other.territories);
     auto newTargets = make_unique<vector<Territory*>>(*other.attackTargets);
+    auto newReservations = make_unique<map<Territory*, int>>(*other.reservedArmies);
     name = newName.release();
     territories = newTerritories.release();
     attackTargets = newTargets.release();
+    reservedArmies = newReservations.release();
     hand = other.hand;
     orders = other.orders;
     reinforcementPool = other.reinforcementPool;
@@ -57,6 +61,7 @@ Player& Player::operator=(const Player& other) {
         swap(hand, copy.hand);
         swap(orders, copy.orders);
         swap(reinforcementPool, copy.reinforcementPool);
+        swap(reservedArmies, copy.reservedArmies);
     }
     return *this;
 }
@@ -66,6 +71,7 @@ Player::~Player() {
     delete name;
     delete territories;
     delete attackTargets;
+    delete reservedArmies;
 }
 
 // A const reference lets the caller read the name without copying/changing it.
@@ -154,25 +160,66 @@ void Player::issueOrder(const string& orderType) {
     if (!orders) {
         throw logic_error("Attach an OrdersList before issuing an order.");
     }
+    if (orders->getOrdersListSize() == 0) reservedArmies->clear();
+    Territory* movementSource = nullptr;
     unique_ptr<Orders> order;
     if (orderType == "deploy") {
-        order = make_unique<Deploy>();
+        const auto defend = toDefend();
+        if (defend.empty()) throw logic_error("Deploy needs an owned territory.");
+        order = make_unique<Deploy>(this, defend.front(), getReinforcementPool());
     } else if (orderType == "advance") {
-        order = make_unique<Advance>();
+        for (Territory* source : toDefend()) {
+            if (availableArmies(source) < 1) continue;
+            for (Territory* target : source->getNeighbours()) {
+                if (source == target) continue;
+                movementSource = source;
+                order = make_unique<Advance>(this, source, target, 1);
+                break;
+            }
+            if (order) break;
+        }
+        if (!order) throw logic_error("Advance needs an owned army and an adjacent target.");
     } else if (orderType == "bomb") {
-        order = make_unique<Bomb>();
+        for (Territory* target : toAttack()) {
+            if (!target->getOwner()) continue;
+            order = make_unique<Bomb>(this, target);
+            break;
+        }
+        if (!order) throw logic_error("Bomb needs an adjacent enemy territory.");
     } else if (orderType == "blockade") {
-        order = make_unique<Blockade>();
+        const auto defend = toDefend();
+        if (defend.empty()) throw logic_error("Blockade needs an owned territory.");
+        order = make_unique<Blockade>(this, defend.front());
     } else if (orderType == "airlift") {
-        order = make_unique<Airlift>();
+        const auto defend = toDefend();
+        for (Territory* source : defend) {
+            if (availableArmies(source) < 1) continue;
+            for (Territory* target : defend) {
+                if (source == target) continue;
+                movementSource = source;
+                order = make_unique<Airlift>(this, source, target, 1);
+                break;
+            }
+            if (order) break;
+        }
+        if (!order) throw logic_error("Airlift needs two owned territories and an army to move.");
     } else if (orderType == "negotiate") {
-        order = make_unique<Negotiate>();
+        // No global roster is available here; choose an enemy known through
+        // adjacent territories rather than inventing a target player.
+        for (Territory* target : toAttack()) {
+            if (!target->getOwner()) continue;
+            order = make_unique<Negotiate>(this, target->getOwner());
+            break;
+        }
+        if (!order) throw logic_error("Negotiate needs a known enemy player.");
     } else {
         throw invalid_argument("Unknown order type: " + orderType);
     }
     // If insertion throws, the temporary pointer cleans up automatically.
+    if (movementSource) reservedArmies->try_emplace(movementSource, 0);
     orders->add(order.get());
     order.release();
+    if (movementSource) ++reservedArmies->at(movementSource);
 }
 
 // Report actual ownership rather than counting shared references as owned.
@@ -200,14 +247,23 @@ void Player::spendReinforcements(int armies) {
     reinforcementPool -= armies;
 }
 
+int Player::availableArmies(Territory* territory) const {
+    const auto reserved = reservedArmies->find(territory);
+    return territory->getArmies() - (reserved == reservedArmies->end() ? 0 : reserved->second);
+}
+
 bool Player::issueOrder(Deck* deck, int& armiesToDeploy, int& nextOrder) {
+    if (!orders) throw logic_error("Attach an OrdersList before issuing an order.");
+    if (orders->getOrdersListSize() == 0) reservedArmies->clear();
     const auto defend = toDefend();
     if (defend.empty()) return false;
     if (armiesToDeploy > 0) {
-        issueOrder("deploy");
+        auto order = make_unique<Deploy>(this, defend.front(), armiesToDeploy);
+        orders->add(order.get());
+        order.release(); // OrdersList owns it; no pool deduction during issuing.
         // Reserve for this phase; only execution may spend the real pool.
-        cout << getName() << " selects Deploy " << armiesToDeploy << " -> "
-             << defend.front()->getName() << " (Part 4 payload not yet available)\n";
+        cout << getName() << " queues Deploy " << armiesToDeploy << " -> "
+             << defend.front()->getName() << '\n';
         armiesToDeploy = 0;
         return true;
     }
@@ -216,15 +272,20 @@ bool Player::issueOrder(Deck* deck, int& armiesToDeploy, int& nextOrder) {
         const bool attack = nextOrder == 1;
         const auto targets = attack ? toAttack() : defend;
         for (Territory* source : defend) {
-            if (source->getArmies() < 1) continue;
+            if (availableArmies(source) < 1) continue;
             for (Territory* target : targets) {
                 const auto& neighbours = source->getNeighbours();
                 if (source == target || find(neighbours.begin(), neighbours.end(), target) == neighbours.end()) continue;
-                issueOrder("advance");
+                const int amount = attack ? availableArmies(source) : 1;
+                auto order = make_unique<Advance>(this, source, target, amount);
+                reservedArmies->try_emplace(source, 0);
+                orders->add(order.get());
+                order.release();
+                reservedArmies->at(source) += amount;
                 ++nextOrder;
-                cout << getName() << " selects " << (attack ? "attack" : "friendly")
-                     << " Advance 1: " << source->getName() << " -> " << target->getName()
-                     << " (Part 4 payload not yet available)\n";
+                cout << getName() << " queues " << (attack ? "attack" : "friendly")
+                     << " Advance " << amount << ": " << source->getName() << " -> " << target->getName()
+                     << '\n';
                 return true;
             }
         }
@@ -232,8 +293,11 @@ bool Player::issueOrder(Deck* deck, int& armiesToDeploy, int& nextOrder) {
     }
     if (hand && hand->getSize() > 0) {
         if (!deck || !orders) throw logic_error("Card issuance needs a Deck and OrdersList.");
-        hand->getCards()->front()->play(*hand, *deck, *orders);
-        return true; // play() shrinks the hand, so repeated calls terminate.
+        for (Card* card : *hand->getCards()) {
+            // Successful play removes this card; return before advancing the
+            // invalidated iterator. Unusable cards stay for another turn.
+            if (card->play(*hand, *deck, *orders, *this)) return true;
+        }
     }
     return false;
 }
