@@ -15,6 +15,9 @@ class Territory; // Forward declaration to avoid circular dependency
 
 class Orders : public Subject, public ILoggable {
 public:
+	Orders();
+	Orders(const Orders& other);
+	Orders& operator=(const Orders& other);
 	virtual ~Orders();
 
 	//Order's type
@@ -37,8 +40,22 @@ public:
 
 	std::string stringToLog() const override;
 
+	// The game controller awards one card to each listed player before endTurn().
+	// These borrowed pointers stay valid only while the participating Players live.
+	static const std::vector<Player*>& getConquerors();
+	static void endTurn(); // Expire negotiations and clear this turn's conquests.
+	// Call with no pending orders, BEFORE the old map/players are destroyed.
+	// Releases Neutral ownership while its borrowed territories are still alive;
+	// the module supports one running game at a time.
+	static void resetGameState();
+
+protected:
+	// Store the effect before notifying the existing logging observers.
+	void recordEffect(const std::string& text);
+
 
 private:
+	std::string* effect; // Owned; copies have independent effect strings.
 	//Overloading
 
 	virtual std::ostream& print(std::ostream&) const = 0;
@@ -60,7 +77,6 @@ public:
 
 	OrdersList();
 	OrdersList(const OrdersList& ol);
-	//OrdersList(const string& user, const vector<Orders>& ol); -- might be useful later
 	~OrdersList();
 
 	//Operator Overloading
@@ -75,7 +91,6 @@ public:
 	void remove(int elemIndex);
 	void move(int iniIndex, int newIndex);
 
-	//const vector<Orders*> remove(const string& order); -- removing per order type could be useful
 
 	//Iterate through the list
 	void execute();
@@ -108,7 +123,7 @@ private:
 	Player* currentPlayer;
 	Territory* target;
 	int amount;
-	const std::string name;
+	std::string name;
 	Orders* clone() const override;
 	std::ostream& print(std::ostream&) const override;
 };
@@ -127,7 +142,7 @@ private:
 	Territory* source;
 	Territory* target;
 	int amount;
-	const std::string name;
+	std::string name;
 	Orders* clone() const override;
 	std::ostream& print(std::ostream&) const override;
 };
@@ -143,7 +158,7 @@ public:
 private:
 	Player* currentPlayer;
 	Territory* target;
-	const std::string name;
+	std::string name;
 	Orders* clone() const override;
 	std::ostream& print(std::ostream&) const override;
 };
@@ -159,7 +174,7 @@ public:
 private:
 	Player* currentPlayer;
 	Territory* target;
-	const std::string name;
+	std::string name;
 	Orders* clone() const override;
 	std::ostream& print(std::ostream&) const override;
 };
@@ -177,7 +192,7 @@ private:
 	Territory* source;
 	Territory* target;
 	int amount;
-	const std::string name;
+	std::string name;
 	Orders* clone() const override;
 	std::ostream& print(std::ostream&) const override;
 };
@@ -193,7 +208,7 @@ public:
 private:
 	Player* currentPlayer;
 	Player* targetPlayer;
-	const std::string name;
+	std::string name;
 	Orders* clone() const override;
 	std::ostream& print(std::ostream&) const override;
 };

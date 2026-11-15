@@ -272,8 +272,11 @@ bool Player::issueOrder(Deck* deck, int& armiesToDeploy, int& nextOrder) {
     }
     if (hand && hand->getSize() > 0) {
         if (!deck || !orders) throw logic_error("Card issuance needs a Deck and OrdersList.");
-        hand->getCards()->front()->play(*hand, *deck, *orders);
-        return true; // play() shrinks the hand, so repeated calls terminate.
+        for (Card* card : *hand->getCards()) {
+            // Successful play removes this card; return before advancing the
+            // invalidated iterator. Unusable cards stay for another turn.
+            if (card->play(*hand, *deck, *orders, *this)) return true;
+        }
     }
     return false;
 }
