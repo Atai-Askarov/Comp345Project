@@ -126,9 +126,10 @@ void startupPhaseWithLog(LogObserver* logObserver) {
               << "  gamestart\n\n";
 
     GameEngine engine;
-    engine.attach(logObserver);
-    if (engine.getCommandProcessor() != nullptr) {
-        engine.getCommandProcessor()->attach(logObserver);
+    engine.attach(logObserver); // log every state change
+    if (engine.getCommandProcessor() != nullptr)
+    {
+        engine.getCommandProcessor()->attach(logObserver); // log every command and its effect
     }
 
     engine.startupPhase();
@@ -137,19 +138,23 @@ void startupPhaseWithLog(LogObserver* logObserver) {
     std::cout << "Current Engine State: [" << engine.getCurrentStateName() << "]\n";
 
     // prints the players in turn order and their reinforcement pools, as well as the remaining deck size
-    if (engine.getPlayers() != nullptr) {
+    if (engine.getPlayers() != nullptr)
+    {
         std::cout << "Players in turn order (" << engine.getPlayers()->size() << "):\n";
-        for (size_t i = 0; i < engine.getPlayers()->size(); ++i) {
-            Player* p = (*engine.getPlayers())[i];
+        for (size_t i = 0; i < engine.getPlayers()->size(); ++i)
+        {
+            Player *p = (*engine.getPlayers())[i];
             std::cout << "  Turn " << (i + 1) << " -> " << *p
                       << " (Reinforcement Pool: " << p->getReinforcementPool() << ")\n";
-            if (p->getHand() != nullptr) {
+            if (p->getHand() != nullptr)
+            {
                 std::cout << "    " << *(p->getHand());
             }
         }
     }
 
-    if (engine.getDeck() != nullptr) {
+    if (engine.getDeck() != nullptr)
+    {
         std::cout << "Remaining Deck Size: " << engine.getDeck()->getSize() << " cards\n";
     }
 }
