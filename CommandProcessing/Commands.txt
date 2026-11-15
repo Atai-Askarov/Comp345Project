@@ -1,0 +1,19 @@
+validatemap
+loadmap
+loadmap europe.map
+gamestart
+loadmap spain.map
+validatemap
+issueorder
+addplayer
+addplayer Alice
+dance
+addplayer Bob
+gamestart
+replay
+loadmap solar.map
+validatemap
+addplayer Carol
+addplayer Dave
+gamestart
+quit

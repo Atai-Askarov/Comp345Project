@@ -1,12 +1,14 @@
 #include "Player.h"
 #include "../Map/Map.h"
 #include "../Orders/Orders.h"
+#include "../Cards/Cards.h"
 
 #include <algorithm>
 #include <memory>
 #include <ostream>
 #include <stdexcept>
 #include <utility>
+#include <limits>
 
 // Use standard library names directly, such as string, vector, and cout.
 using namespace std;
@@ -42,6 +44,7 @@ Player::Player(const Player& other)
     attackTargets = newTargets.release();
     hand = other.hand;
     orders = other.orders;
+    reinforcementPool = other.reinforcementPool;
 }
 
 // Copy first, then swap: if copying fails, the original player stays intact.
@@ -53,6 +56,7 @@ Player& Player::operator=(const Player& other) {
         swap(attackTargets, copy.attackTargets);
         swap(hand, copy.hand);
         swap(orders, copy.orders);
+        swap(reinforcementPool, copy.reinforcementPool);
     }
     return *this;
 }
@@ -179,4 +183,57 @@ ostream& operator<<(ostream& out, const Player& player) {
         << " | hand: " << (player.hand ? "attached" : "not attached")
         << " | orders: " << (player.orders ? "attached" : "not attached");
     return out;
+}
+
+int Player::getReinforcementPool() const { return reinforcementPool; }
+
+void Player::addReinforcements(int armies) {
+    if (armies < 0 || armies > numeric_limits<int>::max() - reinforcementPool)
+        throw invalid_argument("Invalid reinforcement addition.");
+    reinforcementPool += armies;
+}
+
+// Part 4's valid Deploy execution must spend the real pool exactly once.
+void Player::spendReinforcements(int armies) {
+    if (armies < 0 || armies > reinforcementPool)
+        throw invalid_argument("Not enough reinforcement armies.");
+    reinforcementPool -= armies;
+}
+
+bool Player::issueOrder(Deck* deck, int& armiesToDeploy, int& nextOrder) {
+    const auto defend = toDefend();
+    if (defend.empty()) return false;
+    if (armiesToDeploy > 0) {
+        issueOrder("deploy");
+        // Reserve for this phase; only execution may spend the real pool.
+        cout << getName() << " selects Deploy " << armiesToDeploy << " -> "
+             << defend.front()->getName() << " (Part 4 payload not yet available)\n";
+        armiesToDeploy = 0;
+        return true;
+    }
+    // A simple finite policy: one friendly Advance, one enemy Advance, cards.
+    while (nextOrder < 2) {
+        const bool attack = nextOrder == 1;
+        const auto targets = attack ? toAttack() : defend;
+        for (Territory* source : defend) {
+            if (source->getArmies() < 1) continue;
+            for (Territory* target : targets) {
+                const auto& neighbours = source->getNeighbours();
+                if (source == target || find(neighbours.begin(), neighbours.end(), target) == neighbours.end()) continue;
+                issueOrder("advance");
+                ++nextOrder;
+                cout << getName() << " selects " << (attack ? "attack" : "friendly")
+                     << " Advance 1: " << source->getName() << " -> " << target->getName()
+                     << " (Part 4 payload not yet available)\n";
+                return true;
+            }
+        }
+        ++nextOrder;
+    }
+    if (hand && hand->getSize() > 0) {
+        if (!deck || !orders) throw logic_error("Card issuance needs a Deck and OrdersList.");
+        hand->getCards()->front()->play(*hand, *deck, *orders);
+        return true; // play() shrinks the hand, so repeated calls terminate.
+    }
+    return false;
 }

@@ -6,13 +6,14 @@
 #include <string>
 #include <vector>
 
+#include "../Logger/LoggingObserver.h"
 
 using namespace	std;
 
 class Player; // Forward declaration to avoid circular dependency
 class Territory; // Forward declaration to avoid circular dependency
 
-class Orders {
+class Orders : public Subject, public ILoggable {
 public:
 	virtual ~Orders();
 
@@ -32,6 +33,10 @@ public:
 
 	virtual Orders* clone() const = 0;
 
+	//Log line written when the order is executed
+
+	std::string stringToLog() const override;
+
 
 private:
 	//Overloading
@@ -44,7 +49,7 @@ private:
 
 };
 
-class OrdersList {
+class OrdersList : public Subject, public ILoggable {
 
 private:
 	// Owns each stored order; callers must not delete an inserted order.
@@ -82,6 +87,10 @@ public:
 	Orders* getOrder(int elemIndex);
 
 	size_t getOrdersListSize();
+
+	//Log line written when an order is added
+
+	std::string stringToLog() const override;
 
 private:
 	friend std::ostream& operator<<(std::ostream&, const OrdersList&);

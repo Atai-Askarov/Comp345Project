@@ -14,6 +14,10 @@ std::ostream& operator<<(std::ostream& os, const Orders& order) {
 	return order.print(os);
 }
 
+std::string Orders::stringToLog() const {
+	return "Order Executed: " + getName();
+}
+
 //OrdersList
 
 OrdersList::OrdersList() {}
@@ -51,6 +55,14 @@ void OrdersList::add(Orders* order) {
         throw std::invalid_argument("Order already belongs to this list.");
     }
     oL.push_back(order);
+    notify(this);
+}
+
+std::string OrdersList::stringToLog() const {
+    if (oL.empty()) {
+        return "Order Issued: (none)";
+    }
+    return "Order Issued: " + oL.back()->getName();
 }
 
 //Remove method
@@ -168,6 +180,8 @@ void Deploy::execute() {
 		std::cout << "Executing Deploy order..." << std::endl;
 		target->setArmies(target->getArmies() + amount);
 		std::cout << "Deploy order executed successfully." << std::endl;
+		
+		notify(this);
 	}
 }
 
@@ -220,6 +234,8 @@ void Advance::execute() {
 		}
 		std::cout << "Advance order executed successfully." << std::endl;
 		
+		
+		notify(this);
 	}
 }
 
@@ -327,6 +343,8 @@ void Bomb::execute() {
 		target->setArmies(target->getArmies() / 2);
 		std::cout << "Bomb order executed successfully." << std::endl;
 		
+		
+		notify(this);
 	}
 }
 
@@ -367,6 +385,8 @@ void Blockade::execute() {
 		target->setOwner(nullptr); // Territory becomes neutral
 		std::cout << "Blockade order executed successfully." << std::endl;
 		
+		
+		notify(this);
 	}
 }
 
@@ -418,6 +438,8 @@ void Airlift::execute() {
 		target->setArmies(target->getArmies() + amount);
 		
 		std::cout << "Airlift order executed successfully." << std::endl;
+		
+		notify(this);
 	}
 }
 
@@ -459,6 +481,8 @@ void Negotiate::execute() {
 
 		std::cout << "Negotiate order executed successfully." << std::endl;
 		
+		
+		notify(this);
 	}
 }
 
