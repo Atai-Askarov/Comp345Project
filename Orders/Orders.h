@@ -9,6 +9,8 @@
 
 using namespace	std;
 
+class Player; // Forward declaration to avoid circular dependency
+class Territory; // Forward declaration to avoid circular dependency
 
 class Orders {
 public:
@@ -87,13 +89,16 @@ private:
 
 class Deploy : public Orders {
 public:
-	Deploy();
+	Deploy(Player* player, Territory* terr, int qty);
 	~Deploy() override;
 	std::string getName() const override;
 	bool validate() const override;
 	void execute() override;
 
 private:
+	Player* currentPlayer;
+	Territory* target;
+	int amount;
 	const std::string name;
 	Orders* clone() const override;
 	std::ostream& print(std::ostream&) const override;
@@ -101,13 +106,18 @@ private:
 
 class Advance : public Orders {
 public:
-	Advance();
+	Advance(Player* player, Territory* src, Territory* tgt, int qty);
 	~Advance() override;
 	std::string getName() const override;
 	bool validate() const override;
 	void execute() override;
+	void attackSimulation(Territory*, Territory*, Player*, int);
 
 private:
+	Player* currentPlayer;
+	Territory* source;
+	Territory* target;
+	int amount;
 	const std::string name;
 	Orders* clone() const override;
 	std::ostream& print(std::ostream&) const override;
@@ -115,13 +125,15 @@ private:
 
 class Bomb : public Orders {
 public:
-	Bomb();
+	Bomb(Player* player, Territory* tgt);
 	~Bomb() override;
 	std::string getName() const override;
 	bool validate() const override;
 	void execute() override;
 
 private:
+	Player* currentPlayer;
+	Territory* target;
 	const std::string name;
 	Orders* clone() const override;
 	std::ostream& print(std::ostream&) const override;
@@ -129,13 +141,15 @@ private:
 
 class Blockade : public Orders {
 public:
-	Blockade();
+	Blockade(Player* player, Territory* tgt);
 	~Blockade() override;
 	std::string getName() const override;
 	bool validate() const override;
 	void execute() override;
 
 private:
+	Player* currentPlayer;
+	Territory* target;
 	const std::string name;
 	Orders* clone() const override;
 	std::ostream& print(std::ostream&) const override;
@@ -143,13 +157,17 @@ private:
 
 class Airlift : public Orders {
 public:
-	Airlift();
+	Airlift(Player* player, Territory* src, Territory* tgt, int qty);
 	~Airlift() override;
 	std::string getName() const override;
 	bool validate() const override;
 	void execute() override;
 
 private:
+	Player* currentPlayer;
+	Territory* source;
+	Territory* target;
+	int amount;
 	const std::string name;
 	Orders* clone() const override;
 	std::ostream& print(std::ostream&) const override;
@@ -157,13 +175,15 @@ private:
 
 class Negotiate : public Orders {
 public:
-	Negotiate();
+	Negotiate(Player* player, Player* tPlayer);
 	~Negotiate() override;
 	std::string getName() const override;
 	bool validate() const override;
 	void execute() override;
 
 private:
+	Player* currentPlayer;
+	Player* targetPlayer;
 	const std::string name;
 	Orders* clone() const override;
 	std::ostream& print(std::ostream&) const override;

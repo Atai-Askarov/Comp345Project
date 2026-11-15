@@ -138,7 +138,7 @@ std::vector<Orders*>* OrdersList::getOrdersList() {
 
 // Actions
 
-Deploy::Deploy() : name("Deploy") {}
+Deploy::Deploy(Player* player, Territory* terr, int qty) : currentPlayer(player), target(terr), amount(qty), name("Deploy") {}
 
 std::string Deploy::getName() const {
 	return name;
@@ -151,14 +151,23 @@ std::ostream& Deploy::print(std::ostream& os) const {
 bool Deploy::validate() const {
 	std::cout << "Validating Deploy order..." << std::endl;
 	std::cout << "TO BE IMPLEMENTED" << std::endl;
-	return true; // Placeholder
+	if (currentPlayer != target->getOwner()) {
+		std::cout << "You do not possess the territory you are trying to deploy to." << std::endl;
+		return false;
+	}
+	// else if (amount > ) {}             ---- no reinforcementPool variable?
+	else {
+		std::cout << "Deploy order validated successfully." << std::endl;
+		return true; // No invalid inputs
+
+	}
 }
 
 void Deploy::execute() {
 	if (validate()) {
 		std::cout << "Executing Deploy order..." << std::endl;
-		std::cout << "TO BE IMPLEMENTED" << std::endl;
-		// Placeholder
+		target->setArmies(target->getArmies() + amount);
+		std::cout << "Deploy order executed successfully." << std::endl;
 	}
 }
 
@@ -169,7 +178,7 @@ Orders* Deploy::clone() const {
 Deploy::~Deploy() {
 }
 
-Advance::Advance() : name("Advance") {}
+Advance::Advance(Player* player, Territory* src, Territory* tgt, int qty) : currentPlayer(player), source(src), target(tgt), amount(qty), name("Advance") {}
 
 std::string Advance::getName() const {
 	return name;
@@ -181,15 +190,36 @@ std::ostream& Advance::print(std::ostream& os) const {
 
 bool Advance::validate() const {
 	std::cout << "Validating Advance order..." << std::endl;
-	std::cout << "TO BE IMPLEMENTED" << std::endl;
-	return true; // Placeholder
+	if (source->getOwner() != currentPlayer) {
+		std::cout << "You do not own the source territory." << std::endl;
+		return false;
+	}
+	else if (std::find(source->getNeighbours()->begin(), source->getNeighbours()->end(), target) == source->getNeighbours()->end()) {
+		std::cout << "The target territory is not adjacent to the source territory." << std::endl;
+		return false;
+	}
+	else {
+		std::cout << "Advance order validated successfully." << std::endl;
+	return true; // No invalid inputs
+	}
 }
 
 void Advance::execute() {
 	if (validate()) {
 		std::cout << "Executing Advance order..." << std::endl;
-		std::cout << "TO BE IMPLEMENTED" << std::endl;
-		// Placeholder
+		if (source->getOwner() == target->getOwner()) { // Simply moving armies across owned territories
+			source->setArmies(source->getArmies() - amount);
+			target->setArmies(target->getArmies() + amount);
+		}
+		else { // Moving on enemy territory; an attack
+			if (false) { // Placeholder for negotiation check
+				std::cout << "You can't target this player for an attack." << std::endl;
+				return;
+			}
+			attackSimulation(source, target, currentPlayer, amount);
+		}
+		std::cout << "Advance order executed successfully." << std::endl;
+		
 	}
 }
 
@@ -197,10 +227,74 @@ Orders* Advance::clone() const {
 	return new Advance(*this);
 }
 
+void Advance::attackSimulation(Territory* simSource, Territory* simTarget, Player* simCurrentPlayer, int simQty) {
+	int atkKills = 0;
+	int defKills = 0;
+	int aliveAttackers = 0;
+	int aliveAttackees = 0;
+
+	simSource->setArmies(simSource->getArmies() - simQty);
+
+	for (int i = 1; i <= army; i++) // Attackers sim
+	{
+
+		std::random_device dev;
+		std::mt19937 rng(dev());
+		std::uniform_int_distribution<std::mt19937::result_type> range(0, 100);
+
+		int roll = (int)range(rng) % 100 + 1;
+		if (roll <= 60)
+		{
+			atkKills++;
+		}
+	}
+
+	for (int i = 1; i <= simTarget->getArmies(); i++) // Attackee sim
+	{
+
+		std::random_device dev;
+		std::mt19937 rng(dev());
+		std::uniform_int_distribution<std::mt19937::result_type> range(0, 100);
+
+		int roll = (int)range(rng) % 100 + 1;
+
+		if (roll <= 70)
+		{
+			defKills++;
+		}
+	}
+
+	aliveAttackers = max(0, simQty - defKills);
+	aliveAttackees = max(0, simTarget->getArmies() - atkKills);
+
+	if (aliveAttackees == 0) { //Attack take territory
+		std::cout << simCurrentPlayer->getName() << " has successfully conquered " << simTarget->getName() << "!" << std::endl;
+		if (simTarget->getOwner() != nullptr){
+			simTarget->getOwner()->removeTerritory(*simTarget);
+			
+		}
+		simTarget->setOwner(simCurrentPlayer);
+		simCurrentPlayer->addTerritory(*simTarget);
+		simTarget->setArmies(aliveAttackers);
+		
+		//Missing card for 1 conquered territory
+	}
+	else {
+		std::cout << simCurrentPlayer->getName() << " has failed to conquer " << simTarget->getName() << "!" << std::endl;
+		pSource->setArmies(pSource->getArmies() + remainingAttackArmies); // Attackers retreat
+		pTarget->setArmies(remainingDefendArmies);
+		simSource->setArmies(simSource->getArmies() + aliveAttackers); // Attackers retreat
+		simTarget->setArmies(aliveAttackees);
+	})
+
+}
+//REMAKE territory ownership switch. addterritory method already handles it.
+
+
 Advance::~Advance() {
 }
 
-Bomb::Bomb() : name("Bomb") {}
+Bomb::Bomb(Player* player, Territory* tgt) : currentPlayer(player), target(tgt), name("Bomb") {}
 
 std::string Bomb::getName() const {
 	return name;
@@ -212,15 +306,27 @@ std::ostream& Bomb::print(std::ostream& os) const {
 
 bool Bomb::validate() const {
 	std::cout << "Validating Bomb order..." << std::endl;
-	std::cout << "TO BE IMPLEMENTED" << std::endl;
-	return true; // Placeholder
+	if (target->getOwner() == currentPlayer) {
+		std::cout << "You can't bomb your own territory." << std::endl;
+		return false;
+	}
+	for (auto const& terrVector : currentPlayer->getTerritories()) {
+		auto it = std::find(terrVecor->getNeighbours()->begin(), terrVector->getNeighbours()->end(), target->getName());
+		if (it != terrVector->getNeighbours()->end()) {
+			std::cout << "Bomb order validated successfully." << std::endl;
+			return true; // Valid if any of the player's territories are adjacent to the target
+		}
+	}
+	std::cout << "The target territory is not adjacent to any of your territories." << std::endl;
+	return false; 
 }
 
 void Bomb::execute() {
 	if (validate()) {
 		std::cout << "Executing Bomb order..." << std::endl;
-		std::cout << "TO BE IMPLEMENTED" << std::endl;
-		// Placeholder
+		target->setArmies(target->getArmies() / 2);
+		std::cout << "Bomb order executed successfully." << std::endl;
+		
 	}
 }
 
@@ -231,7 +337,7 @@ Orders* Bomb::clone() const {
 Bomb::~Bomb() {
 }
 
-Blockade::Blockade() : name("Blockade") {}
+Blockade::Blockade(Player* player, Territory* tgt) : currentPlayer(player), target(tgt), name("Blockade") {}
 
 std::string Blockade::getName() const {
 	return name;
@@ -243,15 +349,24 @@ std::ostream& Blockade::print(std::ostream& os) const {
 
 bool Blockade::validate() const {
 	std::cout << "Validating Blockade order..." << std::endl;
-	std::cout << "TO BE IMPLEMENTED" << std::endl;
-	return true; // Placeholder
+	if (target->getOwner() != currentPlayer) {
+		std::cout << "You can't blockade a territory you don't own." << std::endl;
+		return false;
+	}
+	else {
+		std::cout << "Blockade order validated successfully." << std::endl;
+		return true; 
+	}
 }
 
 void Blockade::execute() {
 	if (validate()) {
 		std::cout << "Executing Blockade order..." << std::endl;
-		std::cout << "TO BE IMPLEMENTED" << std::endl;
-		// Placeholder
+		target->setArmies(target->getArmies() * 2);
+		target->getOwner()->removeTerritory(*target);
+		target->setOwner(nullptr); // Territory becomes neutral
+		std::cout << "Blockade order executed successfully." << std::endl;
+		
 	}
 }
 
@@ -262,7 +377,7 @@ Orders* Blockade::clone() const {
 Blockade::~Blockade() {
 }
 
-Airlift::Airlift() : name("Airlift") {}
+Airlift::Airlift(Player* player, Territory* src, Territory* tgt, int qty) : currentPlayer(player), source(src), target(tgt), amount(qty) name("Airlift") {}
 
 std::string Airlift::getName() const {
 	return name;
@@ -274,15 +389,35 @@ std::ostream& Airlift::print(std::ostream& os) const {
 
 bool Airlift::validate() const {
 	std::cout << "Validating Airlift order..." << std::endl;
-	std::cout << "TO BE IMPLEMENTED" << std::endl;
-	return true; // Placeholder
+	if (source->getOwner() != currentPlayer && target->getOwner() != currentPlayer) {
+		std::cout << "You can't airlift from or to territories that aren't owned by you." << std::endl;
+		return false;
+	}
+	else if (source == target) {
+		std::cout << "You can't airlift to the same territory." << std::endl;
+		return false;
+	}
+	else if (source->getArmies() < amount) {
+		std::cout << "You don't have this many armies to airlift." << std::endl;
+		return false;
+	}
+	else if (amount <= 0) {
+		std::cout << "You can't airlift a non-positive number of armies." << std::endl;
+		return false;
+	}
+	else {
+		std::cout << "Airlift order validated successfully." << std::endl;
+		return true; // No invalid inputs
+	}
 }
 
 void Airlift::execute() {
 	if (validate()) {
 		std::cout << "Executing Airlift order..." << std::endl;
-		std::cout << "TO BE IMPLEMENTED" << std::endl;
-		// Placeholder
+		source->setArmies(source->getArmies() - amount);
+		target->setArmies(target->getArmies() + amount);
+		
+		std::cout << "Airlift order executed successfully." << std::endl;
 	}
 }
 
@@ -293,7 +428,7 @@ Orders* Airlift::clone() const {
 Airlift::~Airlift() {
 }
 
-Negotiate::Negotiate() : name("Negotiate") {}
+Negotiate::Negotiate(Player* player, Player* tPlayer) : currentPlayer(player), targetPlayer(tPlayer), name("Negotiate") {}
 
 std::string Negotiate::getName() const {
 	return name;
@@ -305,15 +440,25 @@ std::ostream& Negotiate::print(std::ostream& os) const {
 
 bool Negotiate::validate() const {
 	std::cout << "Validating Negotiate order..." << std::endl;
-	std::cout << "TO BE IMPLEMENTED" << std::endl;
-	return true; // Placeholder
+	if (targetPlayer == currentPlayer) {
+		std::cout << "You can't negotiate with yourself." << std::endl;
+		return false;
+
+	}
+	else {
+		std::cout << "Negotiate order validated successfully." << std::endl;
+		return true; // Placeholder
+	}
 }
 
 void Negotiate::execute() {
 	if (validate()) {
 		std::cout << "Executing Negotiate order..." << std::endl;
-		std::cout << "TO BE IMPLEMENTED" << std::endl;
-		// Placeholder
+
+		// NEED A PLAYER ATTRIBUTE TO STORE NEGOTIATION STATUS
+
+		std::cout << "Negotiate order executed successfully." << std::endl;
+		
 	}
 }
 
