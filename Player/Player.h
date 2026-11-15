@@ -4,6 +4,7 @@
 #include <iosfwd>
 #include <string>
 #include <vector>
+#include <map>
 
 // Use standard library names directly, such as string, vector, and cout.
 using namespace std;
@@ -76,6 +77,9 @@ private:
     Hand* hand;
     OrdersList* orders;
     int reinforcementPool = 0;
+    // Owned per-issuing-phase reservations; Territory pointers are borrowed.
+    map<Territory*, int>* reservedArmies;
+    int availableArmies(Territory* territory) const;
 };
 
 #endif

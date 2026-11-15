@@ -3,6 +3,7 @@
 #include <iostream>
 #include <string>
 #include <stdexcept>
+#include <sstream>
 
 /**
  * runs the GameEngine startup phase, allowing the user to enter commands
@@ -57,18 +58,26 @@ void startupPhaseDriver()
 
 int main()
 {
+#ifdef PART3_MENU
+    try { part3Driver(); }
+    catch (const std::exception& error) {
+        std::cerr << "FAIL: " << error.what() << '\n';
+        return 1;
+    }
+#else
     // run the startup phase driver to demonstrate the GameEngine's functionality
     startupPhaseDriver();
+#endif
 
     return 0;
 }
 
-/** Call separately after teammate compilation errors are resolved; main is unchanged.
- * Checks real Deploy and friendly Advance effects, without simulating combat.
- * Ownership changes in case 6 are a fixture, not simulated combat.
- */
-void part3Driver()
+namespace {
+// Every call builds its own map, players, pools, hand and order lists.
+// No new test classes are needed, and menu order cannot affect another case.
+void runPart3Demonstration(int choice)
 {
+    Orders::endTurn(); // Prevent turn-state leakage between independent cases.
     auto check = [](bool condition)
     {
         if (!condition)
@@ -104,58 +113,234 @@ void part3Driver()
     }
     std::vector<Player *> players{&a, &b, &c};
     GameEngine engine;
-    std::cout << "1. Reinforcement: 2 territories + bonus 5 = 8; 11 territories = 3\n";
-    engine.reinforcementPhase(map, players);
-    check(a.getReinforcementPool() == 8 && b.getReinforcementPool() == 3);
-    b.addTerritory(map.getCountries()[0]);
-    engine.reinforcementPhase(map, players);
-    check(a.getReinforcementPool() == 11 && b.getReinforcementPool() == 7);
-    a.addTerritory(map.getCountries()[0]);
+    Territory* first = map.getCountries()[0];
+    Territory* second = map.getCountries()[1];
+    Territory* enemy = map.getCountries()[2];
 
-    std::cout << "2. Only Deploy while armies remain unallocated\n";
-    int remaining = a.getReinforcementPool(), nextOrder = 0;
-    check(a.issueOrder(&deck, remaining, nextOrder) && remaining == 0);
-    check(ordersA.getOrder(0)->getName() == "Deploy" && a.getReinforcementPool() == 11);
-    std::cout << "3. Queue friendly/enemy Advance; execute Deploy and friendly movement\n";
-    check(a.issueOrder(&deck, remaining, nextOrder) && ordersA.getOrder(1)->getName() == "Advance");
-    check(a.issueOrder(&deck, remaining, nextOrder) && ordersA.getOrder(2)->getName() == "Advance");
-    // T1 was removed then restored above, so toDefend() now lists T2, T1.
-    Territory* deployTarget = a.toDefend().front();
-    Territory* friendlyTarget = a.toDefend()[1];
-    const int beforeDeploy = deployTarget->getArmies();
-    ordersA.getOrder(0)->execute();
-    check(deployTarget->getArmies() == beforeDeploy + 11 && a.getReinforcementPool() == 0);
-    ordersA.remove(0);
-    const int sourceBefore = deployTarget->getArmies();
-    const int targetBefore = friendlyTarget->getArmies();
-    ordersA.getOrder(0)->execute();
-    check(deployTarget->getArmies() == sourceBefore - 1 && friendlyTarget->getArmies() == targetBefore + 1);
-    ordersA.remove(0); // The enemy Advance remains queued; no fake conquest.
-    std::cout << "4. Existing Bomb card play queues one order and returns the card\n";
-    hand.addCard(new Card(CardType::Bomb));
-    check(a.issueOrder(&deck, remaining, nextOrder) && ordersA.getOrder(1)->getName() == "Bomb");
-    check(hand.getSize() == 0 && deck.getSize() == 1 && !a.issueOrder(&deck, remaining, nextOrder));
-    while (ordersA.getOrdersListSize())
-        ordersA.remove(0); // End isolated issuing case.
-    std::cout << "Round-robin issuing/execution using teammate orders\n";
-    engine.reinforcementPhase(map, players); // Fresh pool after the executed Deploy.
-    engine.issueOrdersPhase(players, &deck);
-    ordersA.move(0, 1); // Deploy must execute first even behind an Advance.
-    engine.executeOrdersPhase(map, players);
-    check(ordersA.getOrdersListSize() == 0 && ordersB.getOrdersListSize() == 0);
-    engine.executeOrdersPhase(map, players); // Empty queues.
+    switch (choice) {
+    case 1: {
+        std::cout << "\nReinforcement: Alice owns 2 territories and bonus 5; Bob owns 11.\n"
+                  << "Before: Alice pool=" << a.getReinforcementPool() << ", Bob pool=" << b.getReinforcementPool() << '\n';
+        engine.reinforcementPhase(map, players);
+        check(a.getReinforcementPool() == 8 && b.getReinforcementPool() == 3);
+        std::cout << "After: Alice pool=8, Bob pool=3\n";
+        b.addTerritory(first);
+        std::cout << "Next reinforcement: Alice owns 1 territory (no bonus); Bob owns 12.\n";
+        engine.reinforcementPhase(map, players);
+        check(a.getReinforcementPool() == 11 && b.getReinforcementPool() == 7);
+        std::cout << "After: Alice pool=11 (+3), Bob pool=7 (+4). Existing armies were preserved.\n";
+        break;
+    }
+    case 2: {
+        a.addReinforcements(5); b.addReinforcements(3);
+        std::cout << "\nBefore issuing: Alice pool=5, Bob pool=3; both order lists empty.\n"
+                  << "Watch Alice and Bob alternate. Their first orders must be Deploy.\n";
+        engine.issueOrdersPhase(players, &deck);
+        check(ordersA.getOrder(0)->getName() == "Deploy" && ordersB.getOrder(0)->getName() == "Deploy");
+        check(a.getReinforcementPool() == 5 && b.getReinforcementPool() == 3);
+        check(first->getArmies() == 2 && enemy->getArmies() == 2);
+        std::cout << "After issuing: Alice " << ordersA << "Bob " << ordersB
+                  << "All pool armies are allocated; execution, not issuing, spends them.\n";
+        ordersA.move(0, 1); // Still execute Deploy first, even behind Advance.
+        std::cout << "Executing: expect Alice Deploy, Bob Deploy, then alternating Advances.\n";
+        engine.executeOrdersPhase(map, players);
+        check(a.getReinforcementPool() == 0 && b.getReinforcementPool() == 0);
+        check(ordersA.getOrdersListSize() == 0 && ordersB.getOrdersListSize() == 0);
+        engine.executeOrdersPhase(map, players); // Empty queues are harmless.
+        std::cout << "After execution: both pools=0 and both lists empty.\n";
+        break;
+    }
+    case 3: {
+        int remaining = 0, nextOrder = 0;
+        std::cout << "\nBefore: T1=2, T2=2 (Alice); T3=2 (Bob).\n";
+        check(a.issueOrder(&deck, remaining, nextOrder) && ordersA.getOrder(0)->getName() == "Advance");
+        check(a.issueOrder(&deck, remaining, nextOrder) && ordersA.getOrder(1)->getName() == "Advance");
+        ordersA.getOrder(0)->execute(); ordersA.remove(0);
+        check(first->getArmies() == 1 && second->getArmies() == 3);
+        std::cout << "After friendly T1 -> T2: T1=1, T2=3.\n"
+                  << "Now execute the real T2 -> T3 attack; combat results vary.\n";
+        ordersA.getOrder(0)->execute(); ordersA.remove(0);
+        check(second->getArmies() >= 1 && second->getArmies() <= 3
+              && enemy->getArmies() >= 0 && enemy->getArmies() <= 2
+              && (enemy->getOwner() == &a || enemy->getOwner() == &b));
+        check(!a.issueOrder(&deck, remaining, nextOrder));
+        std::cout << "After attack: T2=" << second->getArmies() << ", T3=" << enemy->getArmies()
+                  << ". The attack uses both available source armies; ownership may change.\n";
+        break;
+    }
+    case 4: {
+        int remaining = 0, nextOrder = 2; // Isolate card issuing from Advance decisions.
+        hand.addCard(new Card(CardType::Bomb));
+        std::cout << "\nBefore card play: hand=1, deck=0, orders=0, enemy T3 armies=2.\n";
+        check(a.issueOrder(&deck, remaining, nextOrder));
+        check(hand.getSize() == 0 && deck.getSize() == 1 && ordersA.getOrder(0)->getName() == "Bomb");
+        check(enemy->getArmies() == 2); // No execution during issuing.
+        std::cout << "After issuing: hand=0, deck=1, orders=1; T3 still has 2 armies.\n";
+        ordersA.getOrder(0)->execute(); ordersA.remove(0);
+        check(enemy->getArmies() == 1 && !a.issueOrder(&deck, remaining, nextOrder));
+        std::cout << "After execution: enemy T3 armies=1.\n";
+        break;
+    }
+    case 5:
+        std::cout << "\nBefore: 3 active players. Alice owns 2, Bob 11, Carol 0 territories.\n";
+        engine.eliminatePlayers(map, players);
+        check(players.size() == 2 && players[0] == &a && players[1] == &b && c.getName() == "Carol");
+        std::cout << "After: 2 active players, Alice then Bob. Carol is removed, not deleted.\n";
+        break;
+    case 6:
+        std::cout << "\nControlled ownership fixture, NOT a conquest test.\n"
+                  << "Before: Alice owns 2/13 territories. No winner.\n";
+        check(!engine.checkVictory(map, players));
+        for (size_t i = 0; i + 1 < map.getCountries().size(); ++i) a.addTerritory(map.getCountries()[i]);
+        b.removeTerritory(map.getCountries().back());
+        engine.eliminatePlayers(map, players);
+        check(!engine.checkVictory(map, players));
+        std::cout << "Alice now owns 12/13; the last is unowned. Still no winner despite one active player.\n";
+        a.addTerritory(map.getCountries().back());
+        check(engine.checkVictory(map, players) == &a && engine.getCurrentStateName() == "win");
+        std::cout << "After: Alice owns all 13 territories; engine state=win.\n";
+        break;
+    }
+    Orders::endTurn();
+    std::cout << "PASS: demonstration " << choice << '\n';
+}
 
-    std::cout << "5. Zero-territory Carol is removed without deletion\n";
-    engine.eliminatePlayers(map, players);
-    check(players.size() == 2 && players[0] == &a && players[1] == &b && c.getName() == "Carol");
-    std::cout << "6. Controlled ownership fixture, NOT a conquest test\n";
-    check(!engine.checkVictory(map, players));
-    for (size_t i = 0; i + 1 < map.getCountries().size(); ++i)
-        a.addTerritory(map.getCountries()[i]);
-    b.removeTerritory(map.getCountries().back());
-    engine.eliminatePlayers(map, players);
-    check(!engine.checkVictory(map, players)); // One active player is insufficient.
-    a.addTerritory(map.getCountries().back());
-    check(engine.checkVictory(map, players) == &a && engine.getCurrentStateName() == "win");
-    std::cout << "Part 3 fixture checks passed; full gameplay awaits teammate integration.\n";
+// Watches the real phase transitions; never issues orders or changes ownership.
+struct SimulationTurnLimit {};
+
+class FullGameObserver : public Observer {
+public:
+    FullGameObserver(GameEngine* game, Player* alice, Player* bob)
+        : engine(game), players{alice, bob} { engine->attach(this); }
+    ~FullGameObserver() override { engine->detach(this); }
+
+    void printState() const {
+        for (Player* player : players) {
+            std::cout << player->getName() << " owns";
+            const auto owned = player->toDefend();
+            if (owned.empty()) std::cout << " no territories";
+            for (Territory* territory : owned)
+                std::cout << ' ' << territory->getName() << " (" << territory->getArmies() << " armies)";
+            std::cout << '\n';
+        }
+    }
+
+    void finishTurn() {
+        if (!executing) return;
+        std::cout << "\nEND OF TURN\n";
+        printState();
+        for (int i = 0; i < 2; ++i) {
+            if (participating[i] && players[i]->toDefend().empty()) {
+                std::cout << players[i]->getName() << " was eliminated.\n";
+                participating[i] = false;
+            }
+        }
+        executing = false;
+    }
+
+    void update(ILoggable*) override {
+        const std::string state = engine->getCurrentStateName();
+        if (state == "assign reinforcement") {
+            if (executing) { finishTurn(); return; }
+            if (turns == 100) throw SimulationTurnLimit{};
+            std::cout << "\n========== TURN " << ++turns << " ==========\n\nINITIAL STATE\n";
+            printState();
+            for (int i = 0; i < 2; ++i) poolsBefore[i] = players[i]->getReinforcementPool();
+            std::cout << "\nREINFORCEMENT\n";
+        } else if (state == "issue orders") {
+            for (int i = 0; i < 2; ++i)
+                if (participating[i])
+                    std::cout << players[i]->getName() << " receives "
+                              << players[i]->getReinforcementPool() - poolsBefore[i] << " armies\n";
+            std::cout << "\nISSUE ORDERS\n";
+        } else if (state == "execute orders") {
+            executing = true;
+            std::cout << "\nEXECUTE ORDERS\n";
+        }
+    }
+
+    int getTurns() const { return turns; }
+
+private:
+    GameEngine* engine;
+    Player* players[2];
+    int poolsBefore[2] = {0, 0};
+    bool participating[2] = {true, true};
+    int turns = 0;
+    bool executing = false;
+};
+
+void fullGameSimulation()
+{
+    Map map;
+    Deck deck;
+    Hand handA, handB;
+    OrdersList ordersA, ordersB;
+    Player alice("Alice"), bob("Bob");
+    alice.setHand(&handA); bob.setHand(&handB);
+    alice.setOrdersList(&ordersA); bob.setOrdersList(&ordersB);
+    auto* continent = new Continent("Arena", 0, "red");
+    map.addContinent(continent);
+    auto* first = new Territory(1, "T1", continent);
+    auto* second = new Territory(2, "T2", continent);
+    for (Territory* territory : {first, second}) {
+        map.addCountry(territory);
+        continent->addTerritory(territory);
+        territory->setArmies(2);
+    }
+    first->addNeighbour(second); second->addNeighbour(first);
+    alice.addTerritory(first); bob.addTerritory(second);
+    if (!map.validate()) throw std::logic_error("Simulation map is invalid.");
+    for (int i = 0; i < 5; ++i) deck.addCard(new Card(CardType::Bomb));
+    std::vector<Player*> players{&alice, &bob};
+    GameEngine engine;
+    FullGameObserver observer(&engine, &alice, &bob);
+    bool limited = false;
+    Orders::endTurn();
+    try { engine.mainGameLoop(map, players, &deck); }
+    catch (const SimulationTurnLimit&) { limited = true; }
+    observer.finishTurn();
+    std::cout << "\n========== GAME OVER ==========\n";
+    if (limited) std::cout << "No winner reached within 100 turns. Demonstration stopped safely.\n";
+    else {
+        Player* winner = engine.checkVictory(map, players);
+        if (!winner) throw std::logic_error("Simulation ended without a winner.");
+        std::cout << "Winner: " << winner->getName() << '\n';
+    }
+    std::cout << "Turns played: " << observer.getTurns()
+              << "\nGame state: " << engine.getCurrentStateName() << '\n';
+    // A winning order can leave the opponent's orders pending. The lists own them.
+    while (ordersA.getOrdersListSize()) ordersA.remove(0);
+    while (ordersB.getOrdersListSize()) ordersB.remove(0);
+    Orders::resetGameState(); // Map and players are still alive here.
+}
+} // namespace
+
+// The default main still runs startup; build with -DPART3_MENU for this menu.
+void part3Driver()
+{
+    while (true) {
+        std::cout << "\n=== Part 3 Demonstrations ===\n"
+                  << "1. Reinforcement Phase\n2. Issue Orders Phase\n"
+                  << "3. Execute Orders Phase\n4. Card Demonstration\n"
+                  << "5. Player Elimination\n6. Victory Detection\n"
+                  << "7. Run All Demonstrations\n8. Full Game Simulation\n9. Exit\nChoice: " << std::flush;
+        std::string line, extra;
+        if (!std::getline(std::cin, line)) return;
+        std::istringstream input(line);
+        int choice;
+        if (!(input >> choice) || (input >> extra) || choice < 1 || choice > 9) {
+            std::cout << "Please enter a whole number from 1 to 9.\n";
+            continue;
+        }
+        if (choice == 9) return;
+        if (choice == 8) { fullGameSimulation(); continue; }
+        if (choice == 7) {
+            for (int demonstration = 1; demonstration <= 6; ++demonstration)
+                runPart3Demonstration(demonstration);
+            std::cout << "All six demonstrations passed using fresh fixtures.\n";
+        } else {
+            runPart3Demonstration(choice);
+        }
+    }
 }

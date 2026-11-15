@@ -601,14 +601,23 @@ Player* GameEngine::checkVictory(const Map& gameMap, const std::vector<Player*>&
 
 void GameEngine::mainGameLoop(const Map& gameMap, std::vector<Player*>& activePlayers, Deck* gameDeck) {
     if (gameMap.getCountries().empty()) throw std::logic_error("Cannot play an empty map.");
-    eliminatePlayers(gameMap, activePlayers);
-    if (activePlayers.empty()) throw std::logic_error("No active players own territories.");
-    // Do not run a full game with the current no-effect Part 4 placeholders.
-    // There is deliberately no turn limit or artificial victory condition.
-    while (!checkVictory(gameMap, activePlayers)) {
-        reinforcementPhase(gameMap, activePlayers);
-        issueOrdersPhase(activePlayers, gameDeck);
-        executeOrdersPhase(gameMap, activePlayers);
+    // Keep the engine's owning roster intact; eliminate from participation only.
+    std::vector<Player*> participants = activePlayers;
+    auto& playing = (&activePlayers == players) ? participants : activePlayers;
+    eliminatePlayers(gameMap, playing);
+    if (playing.empty()) throw std::logic_error("No active players own territories.");
+    while (!checkVictory(gameMap, playing)) {
+        reinforcementPhase(gameMap, playing);
+        issueOrdersPhase(playing, gameDeck);
+        executeOrdersPhase(gameMap, playing);
+        // Advance records each conqueror once. Reward before expiring turn state,
+        // even when executeOrdersPhase returned immediately after a winning order.
+        for (Player* conqueror : Orders::getConquerors()) {
+            if (std::find(playing.begin(), playing.end(), conqueror) != playing.end()
+                    && gameDeck && gameDeck->getSize() > 0 && conqueror->getHand())
+                gameDeck->draw(*conqueror->getHand());
+        }
+        Orders::endTurn();
     }
 }
 

@@ -20,28 +20,32 @@ Player::Player() : Player("Unnamed player") {}
 // release() transfers responsibility for cleanup to Player's destructor.
 Player::Player(const string& playerName)
     : name(nullptr), territories(nullptr), attackTargets(nullptr),
-      hand(nullptr), orders(nullptr) {
+      hand(nullptr), orders(nullptr), reservedArmies(nullptr) {
     auto newName = make_unique<string>(playerName);
     auto newTerritories = make_unique<vector<Territory*>>();
     auto newTargets = make_unique<vector<Territory*>>();
+    auto newReservations = make_unique<map<Territory*, int>>();
     name = newName.release();
     territories = newTerritories.release();
     attackTargets = newTargets.release();
+    reservedArmies = newReservations.release();
 }
 
 // Copy the folder's lists, not the map's Territory objects.
 // All borrowed pointers remain shared; copying never changes territory owners.
 Player::Player(const Player& other)
     : name(nullptr), territories(nullptr), attackTargets(nullptr),
-      hand(nullptr), orders(nullptr) {
+      hand(nullptr), orders(nullptr), reservedArmies(nullptr) {
     // Keep ownership local until every allocation and copy succeeds.
     // If any copy throws, these smart pointers release all partial state.
     auto newName = make_unique<string>(*other.name);
     auto newTerritories = make_unique<vector<Territory*>>(*other.territories);
     auto newTargets = make_unique<vector<Territory*>>(*other.attackTargets);
+    auto newReservations = make_unique<map<Territory*, int>>(*other.reservedArmies);
     name = newName.release();
     territories = newTerritories.release();
     attackTargets = newTargets.release();
+    reservedArmies = newReservations.release();
     hand = other.hand;
     orders = other.orders;
     reinforcementPool = other.reinforcementPool;
@@ -57,6 +61,7 @@ Player& Player::operator=(const Player& other) {
         swap(hand, copy.hand);
         swap(orders, copy.orders);
         swap(reinforcementPool, copy.reinforcementPool);
+        swap(reservedArmies, copy.reservedArmies);
     }
     return *this;
 }
@@ -66,6 +71,7 @@ Player::~Player() {
     delete name;
     delete territories;
     delete attackTargets;
+    delete reservedArmies;
 }
 
 // A const reference lets the caller read the name without copying/changing it.
@@ -154,6 +160,8 @@ void Player::issueOrder(const string& orderType) {
     if (!orders) {
         throw logic_error("Attach an OrdersList before issuing an order.");
     }
+    if (orders->getOrdersListSize() == 0) reservedArmies->clear();
+    Territory* movementSource = nullptr;
     unique_ptr<Orders> order;
     if (orderType == "deploy") {
         const auto defend = toDefend();
@@ -161,9 +169,10 @@ void Player::issueOrder(const string& orderType) {
         order = make_unique<Deploy>(this, defend.front(), getReinforcementPool());
     } else if (orderType == "advance") {
         for (Territory* source : toDefend()) {
-            if (source->getArmies() < 1) continue;
+            if (availableArmies(source) < 1) continue;
             for (Territory* target : source->getNeighbours()) {
                 if (source == target) continue;
+                movementSource = source;
                 order = make_unique<Advance>(this, source, target, 1);
                 break;
             }
@@ -184,9 +193,10 @@ void Player::issueOrder(const string& orderType) {
     } else if (orderType == "airlift") {
         const auto defend = toDefend();
         for (Territory* source : defend) {
-            if (source->getArmies() < 1) continue;
+            if (availableArmies(source) < 1) continue;
             for (Territory* target : defend) {
                 if (source == target) continue;
+                movementSource = source;
                 order = make_unique<Airlift>(this, source, target, 1);
                 break;
             }
@@ -206,8 +216,10 @@ void Player::issueOrder(const string& orderType) {
         throw invalid_argument("Unknown order type: " + orderType);
     }
     // If insertion throws, the temporary pointer cleans up automatically.
+    if (movementSource) reservedArmies->try_emplace(movementSource, 0);
     orders->add(order.get());
     order.release();
+    if (movementSource) ++reservedArmies->at(movementSource);
 }
 
 // Report actual ownership rather than counting shared references as owned.
@@ -235,8 +247,14 @@ void Player::spendReinforcements(int armies) {
     reinforcementPool -= armies;
 }
 
+int Player::availableArmies(Territory* territory) const {
+    const auto reserved = reservedArmies->find(territory);
+    return territory->getArmies() - (reserved == reservedArmies->end() ? 0 : reserved->second);
+}
+
 bool Player::issueOrder(Deck* deck, int& armiesToDeploy, int& nextOrder) {
     if (!orders) throw logic_error("Attach an OrdersList before issuing an order.");
+    if (orders->getOrdersListSize() == 0) reservedArmies->clear();
     const auto defend = toDefend();
     if (defend.empty()) return false;
     if (armiesToDeploy > 0) {
@@ -254,16 +272,19 @@ bool Player::issueOrder(Deck* deck, int& armiesToDeploy, int& nextOrder) {
         const bool attack = nextOrder == 1;
         const auto targets = attack ? toAttack() : defend;
         for (Territory* source : defend) {
-            if (source->getArmies() < 1) continue;
+            if (availableArmies(source) < 1) continue;
             for (Territory* target : targets) {
                 const auto& neighbours = source->getNeighbours();
                 if (source == target || find(neighbours.begin(), neighbours.end(), target) == neighbours.end()) continue;
-                auto order = make_unique<Advance>(this, source, target, 1);
+                const int amount = attack ? availableArmies(source) : 1;
+                auto order = make_unique<Advance>(this, source, target, amount);
+                reservedArmies->try_emplace(source, 0);
                 orders->add(order.get());
                 order.release();
+                reservedArmies->at(source) += amount;
                 ++nextOrder;
                 cout << getName() << " queues " << (attack ? "attack" : "friendly")
-                     << " Advance 1: " << source->getName() << " -> " << target->getName()
+                     << " Advance " << amount << ": " << source->getName() << " -> " << target->getName()
                      << '\n';
                 return true;
             }
