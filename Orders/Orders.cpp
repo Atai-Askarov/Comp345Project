@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <memory>
 #include <stdexcept>
+#include <random>
 #include "Orders.h"
 
 
@@ -261,7 +262,7 @@ void Advance::attackSimulation(Territory* simSource, Territory* simTarget, Playe
 
 	simSource->setArmies(simSource->getArmies() - simQty);
 
-	for (int i = 1; i <= army; i++) // Attackers sim
+	for (int i = 1; i <= simQty; i++) // Attackers sim
 	{
 
 		std::random_device dev;
