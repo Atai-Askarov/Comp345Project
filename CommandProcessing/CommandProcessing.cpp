@@ -83,6 +83,11 @@ std::string Command::getEffect() const {
 
 void Command::saveEffect(const std::string& effectText) {
     effect = effectText;
+    notify(this);
+}
+
+std::string Command::stringToLog() const {
+    return "Command's Effect: " + effect;
 }
 
 std::ostream& operator<<(std::ostream& out, const Command& command) {
@@ -136,8 +141,20 @@ bool CommandProcessor::readCommand(std::string& commandText) {
 
 Command* CommandProcessor::saveCommand(const std::string& commandText) {
     Command* command = new Command(commandText);
+    // the new command reports to the same observers as this processor
+    for (Observer* observer : *getObservers()) {
+        command->attach(observer);
+    }
     commands.push_back(command);
+    notify(this);
     return command;
+}
+
+std::string CommandProcessor::stringToLog() const {
+    if (commands.empty()) {
+        return "Command: (none)";
+    }
+    return "Command: " + commands.back()->getText();
 }
 
 bool CommandProcessor::validate(Command* command) {

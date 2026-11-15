@@ -1,5 +1,4 @@
 #include "GameEngine.h"
-#include "LoggingObserver.h"
 
 #include <iostream>
 #include <string>
@@ -21,14 +20,7 @@ void startupPhaseDriver()
               << "  addplayer Bob\n"
               << "  gamestart\n\n";
 
-    LogObserver logObserver;
     GameEngine engine;
-    engine.attach(&logObserver);
-    if (engine.getCommandProcessor() != nullptr)
-    {
-        engine.getCommandProcessor()->attach(&logObserver);
-    }
-
     engine.startupPhase();
 
     std::cout << "\n--- Post-Startup Verification ---\n";
@@ -53,12 +45,6 @@ void startupPhaseDriver()
     if (engine.getDeck() != nullptr)
     {
         std::cout << "Remaining Deck Size: " << engine.getDeck()->getSize() << " cards\n";
-    }
-
-    engine.detach(&logObserver);
-    if (engine.getCommandProcessor() != nullptr)
-    {
-        engine.getCommandProcessor()->detach(&logObserver);
     }
 }
 

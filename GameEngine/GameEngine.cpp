@@ -246,7 +246,7 @@ GameEngine::GameEngine()
       map(nullptr),
       deck(new Deck()),
       players(new std::vector<Player *>()),
-      commandProcessor(new CommandProcessor()),
+      commandProcessor(new CommandProcessor(this)),
       ownsCommandProcessor(true)
 {
     buildStateGraph();
@@ -257,7 +257,7 @@ GameEngine::GameEngine(CommandProcessor *processor)
       map(nullptr),
       deck(new Deck()),
       players(new std::vector<Player *>()),
-      commandProcessor(processor != nullptr ? processor : new CommandProcessor()),
+      commandProcessor(processor != nullptr ? processor : new CommandProcessor(this)),
       ownsCommandProcessor(processor == nullptr)
 {
     buildStateGraph();
@@ -439,10 +439,7 @@ bool GameEngine::processCommand(const std::string &command)
         return false;
     }
 
-    State *previous = currentState;
-    currentState = transition(nextTransition->getTarget());
-    std::cout << "[" << previous->getName() << "] --" << cleaned << "--> ["
-              << (currentState != nullptr ? currentState->getName() : "none") << "]" << std::endl;
+    transition(nextTransition->getTarget());
     return true;
 }
 
@@ -491,4 +488,455 @@ std::ostream &operator<<(std::ostream &out, const GameEngine &engine)
         }
     }
     return out;
+}
+
+/** Returns the log line describing the new state of the engine. */
+std::string GameEngine::stringToLog() const {
+    return "Game Engine New State: " + currentState->getName();
+}
+
+void GameEngine::enterPlayState(const std::string& name) {
+    for (State* state : states) {
+        if (state->getName() == name) { transition(state); return; }
+    }
+    throw std::logic_error("Unknown gameplay state.");
+}
+
+void GameEngine::reinforcementPhase(const Map& gameMap, const std::vector<Player*>& activePlayers) {
+    enterPlayState("assign reinforcement");
+    for (Player* player : activePlayers) {
+        const auto& territories = gameMap.getCountries();
+        const int owned = static_cast<int>(std::count_if(territories.begin(), territories.end(),
+            [player](Territory* t) { return t->getOwner() == player; }));
+        if (owned == 0) continue;
+        int award = std::max(3, owned / 3);
+        for (Continent* continent : gameMap.getContinents()) {
+            const auto& members = continent->getTerritories();
+            if (!members.empty() && std::all_of(members.begin(), members.end(),
+                    [player](Territory* t) { return t->getOwner() == player; }))
+                award += continent->getBonus();
+        }
+        player->addReinforcements(award);
+    }
+}
+
+void GameEngine::issueOrdersPhase(const std::vector<Player*>& activePlayers, Deck* gameDeck) {
+    // Never silently reset reservations while old orders are still pending.
+    for (size_t i = 0; i < activePlayers.size(); ++i) {
+        OrdersList* list = activePlayers[i]->getOrdersList();
+        if (!list || list->getOrdersListSize() != 0)
+            throw std::logic_error("Each active player needs an empty OrdersList.");
+        for (size_t j = 0; j < i; ++j)
+            if (list == activePlayers[j]->getOrdersList())
+                throw std::logic_error("Active players must have separate order lists.");
+    }
+    enterPlayState("issue orders");
+    std::vector<int> remainingArmies, nextOrder(activePlayers.size(), 0);
+    for (Player* player : activePlayers) remainingArmies.push_back(player->getReinforcementPool());
+    std::vector<bool> finished(activePlayers.size(), false);
+    size_t remaining = activePlayers.size();
+    while (remaining > 0) {
+        for (size_t i = 0; i < activePlayers.size(); ++i) {
+            if (!finished[i] && !activePlayers[i]->issueOrder(gameDeck, remainingArmies[i], nextOrder[i])) {
+                finished[i] = true;
+                --remaining;
+            }
+        }
+    }
+}
+
+void GameEngine::executeOrdersPhase(const Map& gameMap, std::vector<Player*>& activePlayers) {
+    if (checkVictory(gameMap, activePlayers)) return;
+    enterPlayState("execute orders");
+    // One matching order per player per sweep. Pass 0 selects Deploy even if
+    // it was moved behind another type; pass 1 consumes the remaining fronts.
+    for (int pass = 0; pass < 2; ++pass) {
+        bool executed;
+        do {
+            executed = false;
+            for (Player* player : activePlayers) {
+                OrdersList* list = player->getOrdersList();
+                if (!list) throw std::logic_error("Active player has no OrdersList.");
+                for (size_t i = 0; i < list->getOrdersListSize(); ++i) {
+                    Orders* order = list->getOrder(static_cast<int>(i));
+                    if (pass == 0 && order->getName() != "Deploy") continue;
+                    std::cout << player->getName() << " executes " << order->getName() << '\n';
+                    order->execute(); // Part 4 performs validation and effects.
+                    list->remove(static_cast<int>(i)); // Deletes the order.
+                    if (checkVictory(gameMap, activePlayers)) {
+                        eliminatePlayers(gameMap, activePlayers);
+                        return;
+                    }
+                    executed = true;
+                    break;
+                }
+            }
+        } while (executed);
+    }
+    eliminatePlayers(gameMap, activePlayers);
+    enterPlayState("assign reinforcement");
+}
+
+void GameEngine::eliminatePlayers(const Map& gameMap, std::vector<Player*>& activePlayers) {
+    const auto& territories = gameMap.getCountries();
+    activePlayers.erase(std::remove_if(activePlayers.begin(), activePlayers.end(), [&](Player* player) {
+        return std::none_of(territories.begin(), territories.end(),
+            [player](Territory* t) { return t->getOwner() == player; });
+    }), activePlayers.end()); // Erase participation only, never delete Player.
+}
+
+Player* GameEngine::checkVictory(const Map& gameMap, const std::vector<Player*>& activePlayers) {
+    const auto& territories = gameMap.getCountries();
+    if (territories.empty()) return nullptr;
+    Player* winner = territories.front()->getOwner();
+    if (!winner || std::find(activePlayers.begin(), activePlayers.end(), winner) == activePlayers.end()) return nullptr;
+    if (!std::all_of(territories.begin(), territories.end(),
+            [winner](Territory* t) { return t->getOwner() == winner; })) return nullptr;
+    if (getCurrentStateName() != "win") {
+        enterPlayState("win");
+        std::cout << "Winner: " << winner->getName() << '\n';
+    }
+    return winner;
+}
+
+void GameEngine::mainGameLoop(const Map& gameMap, std::vector<Player*>& activePlayers, Deck* gameDeck) {
+    if (gameMap.getCountries().empty()) throw std::logic_error("Cannot play an empty map.");
+    eliminatePlayers(gameMap, activePlayers);
+    if (activePlayers.empty()) throw std::logic_error("No active players own territories.");
+    // Do not run a full game with the current no-effect Part 4 placeholders.
+    // There is deliberately no turn limit or artificial victory condition.
+    while (!checkVictory(gameMap, activePlayers)) {
+        reinforcementPhase(gameMap, activePlayers);
+        issueOrdersPhase(activePlayers, gameDeck);
+        executeOrdersPhase(gameMap, activePlayers);
+    }
+}
+
+
+// -------------------------------------------- Getters & Setters for Startup Phase
+
+/** Returns the loaded Map pointer. */
+Map *GameEngine::getMap() const
+{
+    return map;
+}
+
+/** Returns the game Deck pointer. */
+Deck *GameEngine::getDeck() const
+{
+    return deck;
+}
+
+/** Returns the pointer to the vector of active Players. */
+std::vector<Player *> *GameEngine::getPlayers() const
+{
+    return players;
+}
+
+/** Returns the active CommandProcessor pointer. */
+CommandProcessor *GameEngine::getCommandProcessor() const
+{
+    return commandProcessor;
+}
+
+/** Sets an external CommandProcessor without taking ownership of its memory. */
+void GameEngine::setCommandProcessor(CommandProcessor *processor)
+{
+    if (ownsCommandProcessor && commandProcessor != nullptr)
+    {
+        delete commandProcessor;
+    }
+    commandProcessor = processor;
+    ownsCommandProcessor = false;
+}
+
+
+void GameEngine::startupPhase()
+{
+    if (commandProcessor == nullptr)
+    {
+        std::cout << "Error: No CommandProcessor attached to GameEngine." << std::endl;
+        return;
+    }
+    std::cout << "\n=== Game Startup Phase ===" << std::endl;
+    while (currentState != nullptr && currentState->getName() != "assign reinforcement" && !isFinished())
+    {
+        std::cout << "\nCurrent state: [" << currentState->getName() << "]" << std::endl;
+        std::cout << "Valid commands:";
+        for (const std::string &validCmd : getValidCommands())
+        {
+            std::cout << " " << validCmd;
+        }
+        std::cout << std::endl;
+        if (currentState->getName() == "start" || currentState->getName() == "map loaded")
+        {
+            std::vector<std::string> availableMaps = findAvailableMapFiles();
+            std::cout << "Available map files in directory:";
+            if (availableMaps.empty())
+            {
+                std::cout << " (none found in '.' or './maps')";
+            }
+            else
+            {
+                for (const std::string &mapFile : availableMaps)
+                {
+                    std::cout << " " << mapFile;
+                }
+            }
+            std::cout << std::endl;
+        }
+        Command *cmd = commandProcessor->getCommand();
+        if (cmd == nullptr)
+        {
+            std::cout << "No more commands available. Ending startup phase." << std::endl;
+            break;
+        } // Validate command against current game state
+        if (!commandProcessor->validate(cmd))
+        {
+            std::cout << "Invalid command in state [" << currentState->getName() << "]." << std::endl;
+            continue;
+        }
+        std::string baseCmd;
+        std::string arg;
+        splitCommandAndArg(cmd->getText(), baseCmd, arg);
+        Transition *nextTransition = currentState->findTransition(baseCmd);
+        if (nextTransition == nullptr)
+        {
+            cmd->saveEffect("Error: No state transition found for command '" + baseCmd + "'.");
+            continue;
+        }
+        std::string effect;
+        bool success = false;
+        if (baseCmd == "loadmap")
+        {
+            success = handleLoadMap(arg, effect);
+        }
+        else if (baseCmd == "validatemap")
+        {
+            success = handleValidateMap(effect);
+        }
+        else if (baseCmd == "addplayer")
+        {
+            success = handleAddPlayer(arg, effect);
+        }
+        else if (baseCmd == "gamestart")
+        {
+            success = handleGameStart(effect);
+        }
+        else
+        {
+            effect = "Error: Unsupported startup command '" + baseCmd + "'.";
+        }
+        cmd->saveEffect(effect);
+        std::cout << effect << std::endl;
+        if (success)
+        {
+            transition(nextTransition->getTarget());
+        }
+    }
+}
+
+
+/**
+• Handles "loadmap ":
+• Loads the requested map using MapLoader.
+*/
+bool GameEngine::handleLoadMap(const std::string &filename, std::string &effectOut)
+{
+    if (filename.empty())
+    {
+        effectOut = "Error: loadmap requires a  argument.";
+        return false;
+    } // Check direct path first, then fallback to maps/
+    std::string resolvedPath = filename;
+    std::error_code ec;
+    if (!std::filesystem::exists(resolvedPath, ec))
+    {
+        std::filesystem::path fallback = std::filesystem::path("maps") / filename;
+        if (std::filesystem::exists(fallback, ec))
+        {
+            resolvedPath = fallback.string();
+        }
+    }
+    MapLoader loader;
+    Map *loadedMap = nullptr;
+    try
+    {
+        loadedMap = loader.loadMap(resolvedPath);
+    }
+    catch (const std::exception &ex)
+    {
+        effectOut = "Error: Failed to load map '" + filename + "' (" + ex.what() + ").";
+        return false;
+    }
+    if (loadedMap == nullptr)
+    {
+        effectOut = "Error: Failed to load map '" + filename + "'.";
+        return false;
+    } // Replace any previously loaded map without leaking memory
+    delete map;
+    map = loadedMap;
+    effectOut = "Map '" + resolvedPath + "' loaded successfully (" + std::to_string(map->getContinents().size()) + " continents, " + std::to_string(map->getCountries().size()) + " territories).";
+    return true;
+}
+
+
+
+/**
+• Handles "validatemap":
+• Checks that a map is loaded and passes Map::validate() (connected graph,
+• connected continents, each territory belongs to exactly one continent).
+*/
+bool GameEngine::handleValidateMap(std::string &effectOut)
+{
+    if (map == nullptr)
+    {
+        effectOut = "Error: No map is currently loaded to validate.";
+        return false;
+    }
+    if (!map->validate())
+    {
+        effectOut = "Error: Map validation failed (map is not a valid connected graph).";
+        return false;
+    }
+    effectOut = "Map validated successfully.";
+    return true;
+}
+
+
+
+/**
+• Handles "addplayer ":
+• Adds a player to the game (enforcing 2-6 players total) and attaches
+• their Hand and OrdersList so they are ready for gameplay.
+*/
+bool GameEngine::handleAddPlayer(const std::string &playerName, std::string &effectOut)
+{
+    if (playerName.empty())
+    {
+        effectOut = "Error: addplayer requires a  argument.";
+        return false;
+    }
+    if (players == nullptr)
+    {
+        players = new std::vector<Player *>();
+    }
+    if (players->size() >= 6)
+    {
+        effectOut = "Error: Maximum of 6 players already reached. Cannot add '" + playerName + "'.";
+        return false;
+    }
+    for (const Player *existing : *players)
+    {
+        if (existing != nullptr && existing->getName() == playerName)
+        {
+            effectOut = "Error: Player '" + playerName + "' already exists in the game.";
+            return false;
+        }
+    }
+    Player *newPlayer = new Player(playerName);
+    newPlayer->setHand(new Hand());
+    newPlayer->setOrdersList(new OrdersList());
+    players->push_back(newPlayer);
+    effectOut = "Player '" + playerName + "' added (" + std::to_string(players->size()) + "/6 players).";
+    return true;
+}
+
+/**
+ * Handles "gamestart":
+ * 4a) Fairly distributes all territories to the players
+ * 4b) Randomly determines the order of play of the players
+ * 4c) Gives 50 initial armies to each player's reinforcement pool
+ * 4d) Lets each player draw 2 initial cards from the deck using Deck::draw()
+ * 4e) Signals readiness to transition into the play phase ("assign reinforcement")
+ */
+bool GameEngine::handleGameStart(std::string &effectOut)
+{
+    if (map == nullptr)
+    {
+        effectOut = "Error: Cannot start game without a loaded and validated map.";
+        return false;
+    }
+
+    if (players == nullptr || players->size() < 2 || players->size() > 6)
+    {
+        size_t count = (players != nullptr) ? players->size() : 0;
+        effectOut = "Error: Game requires 2 to 6 players to start (currently " + std::to_string(count) + ").";
+        return false;
+    }
+
+    // 4b) Determine randomly the order of play of the players in the game
+    unsigned int seed = static_cast<unsigned int>(
+        std::chrono::system_clock::now().time_since_epoch().count());
+    std::default_random_engine rng(seed);
+    std::shuffle(players->begin(), players->end(), rng);
+
+    // 4a) Fairly distribute all the territories to the players (round-robin)
+    std::vector<Territory *> allTerritories = map->getCountries();
+    std::shuffle(allTerritories.begin(), allTerritories.end(), rng);
+    for (size_t i = 0; i < allTerritories.size(); ++i)
+    {
+        Player *assignedPlayer = (*players)[i % players->size()];
+        assignedPlayer->addTerritory(allTerritories[i]);
+    }
+
+    // Ensure the Deck is populated with cards before drawing
+    if (deck == nullptr)
+    {
+        deck = new Deck();
+    }
+    if (deck->getSize() == 0)
+    {
+        const CardType allTypes[] = {
+            CardType::Bomb,
+            CardType::Reinforcement,
+            CardType::Blockade,
+            CardType::Airlift,
+            CardType::Diplomacy};
+
+        // Populate 30 cards (6 of each type) so up to 6 players can draw 2 cards each
+        for (int copy = 0; copy < 6; ++copy)
+        {
+            for (CardType type : allTypes)
+            {
+                deck->addCard(new Card(type));
+            }
+        }
+    }
+
+    // 4c) Give 50 initial armies to each player & 4d) Draw 2 initial cards
+    const int INITIAL_ARMIES = 50;
+
+    std::ostringstream summary;
+    summary << "Game started! Play order:";
+    for (size_t i = 0; i < players->size(); ++i)
+    {
+        Player *p = (*players)[i];
+
+        // Ensure Hand and OrdersList are attached in case a player was added externally
+        if (p->getHand() == nullptr)
+        {
+            p->setHand(new Hand());
+        }
+        if (p->getOrdersList() == nullptr)
+        {
+            p->setOrdersList(new OrdersList());
+        }
+
+        // 4c) 50 initial armies in reinforcement pool
+        p->addReinforcements(INITIAL_ARMIES);
+
+        // 4d) Let each player draw 2 initial cards from the deck using Deck::draw()
+        deck->draw(*p->getHand());
+        deck->draw(*p->getHand());
+
+        summary << "\n  " << (i + 1) << ". " << p->getName()
+                << " | Territories: " << p->toDefend().size()
+                << " | Initial Armies: " << INITIAL_ARMIES
+                << " | Cards in Hand: " << p->getHand()->getSize();
+    }
+
+    // 4e) Returning true triggers transition("assign reinforcement") in startupPhase()
+    effectOut = summary.str();
+    return true;
 }

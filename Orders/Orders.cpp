@@ -14,6 +14,10 @@ std::ostream& operator<<(std::ostream& os, const Orders& order) {
 	return order.print(os);
 }
 
+std::string Orders::stringToLog() const {
+	return "Order Executed: " + getName();
+}
+
 //OrdersList
 
 OrdersList::OrdersList() {}
@@ -51,6 +55,14 @@ void OrdersList::add(Orders* order) {
         throw std::invalid_argument("Order already belongs to this list.");
     }
     oL.push_back(order);
+    notify(this);
+}
+
+std::string OrdersList::stringToLog() const {
+    if (oL.empty()) {
+        return "Order Issued: (none)";
+    }
+    return "Order Issued: " + oL.back()->getName();
 }
 
 //Remove method
@@ -159,6 +171,7 @@ void Deploy::execute() {
 		std::cout << "Executing Deploy order..." << std::endl;
 		std::cout << "TO BE IMPLEMENTED" << std::endl;
 		// Placeholder
+		notify(this);
 	}
 }
 
@@ -190,6 +203,7 @@ void Advance::execute() {
 		std::cout << "Executing Advance order..." << std::endl;
 		std::cout << "TO BE IMPLEMENTED" << std::endl;
 		// Placeholder
+		notify(this);
 	}
 }
 
@@ -221,6 +235,7 @@ void Bomb::execute() {
 		std::cout << "Executing Bomb order..." << std::endl;
 		std::cout << "TO BE IMPLEMENTED" << std::endl;
 		// Placeholder
+		notify(this);
 	}
 }
 
@@ -252,6 +267,7 @@ void Blockade::execute() {
 		std::cout << "Executing Blockade order..." << std::endl;
 		std::cout << "TO BE IMPLEMENTED" << std::endl;
 		// Placeholder
+		notify(this);
 	}
 }
 
@@ -283,6 +299,7 @@ void Airlift::execute() {
 		std::cout << "Executing Airlift order..." << std::endl;
 		std::cout << "TO BE IMPLEMENTED" << std::endl;
 		// Placeholder
+		notify(this);
 	}
 }
 
@@ -314,6 +331,7 @@ void Negotiate::execute() {
 		std::cout << "Executing Negotiate order..." << std::endl;
 		std::cout << "TO BE IMPLEMENTED" << std::endl;
 		// Placeholder
+		notify(this);
 	}
 }
 
