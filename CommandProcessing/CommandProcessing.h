@@ -1,5 +1,6 @@
 #ifndef COMMANDPROCESSING_H
 #define COMMANDPROCESSING_H
+#include "../Logger/LoggingObserver.h"
 
 #include <fstream>
 #include <iostream>
@@ -13,7 +14,7 @@ class GameEngine;
  * "loadmap europe.map". It stores the original text and, once the command has
  * been handled, a string describing its effect (or the reason it was rejected).
  */
-class Command {
+class Command : public Subject, public ILoggable {
 public:
     /** Creates a command from the text that was read; its effect starts empty. */
     explicit Command(const std::string& text);
@@ -42,6 +43,9 @@ public:
     /** Records the effect of this command (or the error that rejected it). */
     void saveEffect(const std::string& effectText);
 
+    /** Returns the log line for this command's effect. */
+    std::string stringToLog() const override;
+
     /** Stream insertion: prints the command text and its effect. */
     friend std::ostream& operator<<(std::ostream& out, const Command& command);
 
@@ -55,7 +59,7 @@ private:
  * Command objects and checks whether they are valid in the current game state.
  * Game components must obtain their commands through getCommand().
  */
-class CommandProcessor {
+class CommandProcessor : public Subject, public ILoggable {
 public:
     /** Creates a processor that validates commands against the state of 'engine' (not owned). */
     explicit CommandProcessor(GameEngine* engine);
@@ -87,6 +91,9 @@ public:
 
     /** Stream insertion: prints every saved command with its effect. */
     friend std::ostream& operator<<(std::ostream& out, const CommandProcessor& processor);
+
+    /** Returns the log line for the most recently saved command. */
+    std::string stringToLog() const override;
 
 protected:
     /**

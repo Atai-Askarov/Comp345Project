@@ -242,7 +242,7 @@ bool GameEngine::processCommand(const std::string& command) {
     }
 
     State* previous = currentState;
-    currentState = transition->getTarget();
+    this->transition(transition->getTarget());
     std::cout << "[" << previous->getName() << "] --" << cleaned << "--> ["
               << currentState->getName() << "]" << std::endl;
     return true;
@@ -276,7 +276,17 @@ std::ostream& operator<<(std::ostream& out, const GameEngine& engine) {
     return out;
 }
 
-// Part 5 supplies transition(); do not bypass its future logging mechanism.
+/** Moves the engine to 'newState' and notifies the observers (logging). */
+void GameEngine::transition(State* newState) {
+    currentState = newState;
+    notify(this);
+}
+
+/** Returns the log line describing the new state of the engine. */
+std::string GameEngine::stringToLog() const {
+    return "Game Engine New State: " + currentState->getName();
+}
+
 void GameEngine::enterPlayState(const std::string& name) {
     for (State* state : states) {
         if (state->getName() == name) { transition(state); return; }
