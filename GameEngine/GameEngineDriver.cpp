@@ -4,12 +4,13 @@
 #include <string>
 #include <stdexcept>
 #include <sstream>
+#include <algorithm>
 
 /**
  * runs the GameEngine startup phase, allowing the user to enter commands
  * to load a map, validate it, add players, and start the game.
  */
-void startupPhaseDriver()
+void startupPhaseDriver(int argc, char *argv[])
 {
     std::cout << "=========================================\n"
               << "   Part 2: Game Startup Phase Driver\n"
@@ -22,14 +23,30 @@ void startupPhaseDriver()
               << "  gamestart\n\n";
 
     GameEngine engine;
+    FileCommandProcessorAdapter *fileProcessor = nullptr;
+    if (argc >= 3 && std::string(argv[1]) == "-file")
+    {
+        fileProcessor = new FileCommandProcessorAdapter(&engine, argv[2]);
+        engine.setCommandProcessor(fileProcessor);
+    }
     engine.startupPhase();
 
     std::cout << "\n--- Post-Startup Verification ---\n";
     std::cout << "Current Engine State: [" << engine.getCurrentStateName() << "]\n";
+    if (engine.getMap() != nullptr)
+    {
+        std::cout << "Map territories: " << engine.getMap()->getCountries().size() << "\n";
+    }
 
     // prints the players in turn order and their reinforcement pools, as well as the remaining deck size
     if (engine.getPlayers() != nullptr)
     {
+        size_t fewest = engine.getMap() ? engine.getMap()->getCountries().size() : 0, most = 0;
+        for (Player *p : *engine.getPlayers())
+        {
+            fewest = std::min(fewest, p->toDefend().size());
+            most = std::max(most, p->toDefend().size());
+        }
         std::cout << "Players in turn order (" << engine.getPlayers()->size() << "):\n";
         for (size_t i = 0; i < engine.getPlayers()->size(); ++i)
         {
@@ -41,12 +58,18 @@ void startupPhaseDriver()
                 std::cout << "    " << *(p->getHand());
             }
         }
+        if (!engine.getPlayers()->empty() && engine.getCurrentStateName() == "assign reinforcement")
+        {
+            std::cout << "Fair distribution (counts differ by <= 1): " << (most - fewest <= 1 ? "yes" : "NO") << "\n";
+        }
     }
 
     if (engine.getDeck() != nullptr)
     {
         std::cout << "Remaining Deck Size: " << engine.getDeck()->getSize() << " cards\n";
     }
+    engine.setCommandProcessor(nullptr);
+    delete fileProcessor;
 }
 
 /**
@@ -56,7 +79,7 @@ void startupPhaseDriver()
  * The program ends when the "quit" command is entered in the "win" state.
  */
 
-int main()
+int main(int argc, char *argv[])
 {
 #ifdef PART3_MENU
     try { part3Driver(); }
@@ -66,7 +89,7 @@ int main()
     }
 #else
     // run the startup phase driver to demonstrate the GameEngine's functionality
-    startupPhaseDriver();
+    startupPhaseDriver(argc, argv);
 #endif
 
     return 0;

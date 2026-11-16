@@ -76,23 +76,23 @@ int indexOfState(const std::vector<State*>& states, const State* target) {
         arg = fullCommand.substr(argStart, argEnd - argStart);
     }
 
-    /** Lists available .map files in the current directory and ./maps (if it exists). */
+    const std::vector<std::string> MAP_DIRECTORIES = {".", "maps", "Map/Assets", "../Map/Assets", "../../Map/Assets"};
+
     std::vector<std::string> findAvailableMapFiles()
     {
         std::vector<std::string> mapFiles;
-        const std::vector<std::string> searchDirs = {".", "maps"};
-        for (const std::string &dir : searchDirs)
+        for (const std::string &dir : MAP_DIRECTORIES)
         {
             std::error_code ec;
-            if (!std::filesystem::exists(dir, ec) || !std::filesystem::is_directory(dir, ec))
+            if (!std::filesystem::is_directory(dir, ec))
             {
                 continue;
             }
-            for (const auto &entry : std::filesystem::directory_iterator(dir, ec))
+            for (std::filesystem::recursive_directory_iterator it(dir, ec), end; !ec && it != end; it.increment(ec))
             {
-                if (entry.is_regular_file(ec) && entry.path().extension() == ".map")
+                if (it->is_regular_file(ec) && it->path().extension() == ".map")
                 {
-                    std::string pathStr = entry.path().lexically_normal().string();
+                    std::string pathStr = it->path().lexically_normal().string();
                     if (std::find(mapFiles.begin(), mapFiles.end(), pathStr) == mapFiles.end())
                     {
                         mapFiles.push_back(pathStr);
@@ -102,6 +102,24 @@ int indexOfState(const std::vector<State*>& states, const State* target) {
         }
         std::sort(mapFiles.begin(), mapFiles.end());
         return mapFiles;
+    }
+
+    std::string resolveMapPath(const std::string &requested)
+    {
+        std::error_code ec;
+        if (std::filesystem::is_regular_file(requested, ec))
+        {
+            return requested;
+        }
+        const std::string requestedName = std::filesystem::path(requested).filename().string();
+        for (const std::string &candidate : findAvailableMapFiles())
+        {
+            if (std::filesystem::path(candidate).filename().string() == requestedName)
+            {
+                return candidate;
+            }
+        }
+        return "";
     }
 
 } // namespace
@@ -361,7 +379,10 @@ void GameEngine::copyFrom(const GameEngine &other)
     {
         for (const Player *player : *(other.players))
         {
-            players->push_back(new Player(*player));
+            Player *copy = new Player(*player);
+            copy->setHand(player->getHand() != nullptr ? new Hand(*player->getHand()) : nullptr);
+            copy->setOrdersList(player->getOrdersList() != nullptr ? new OrdersList(*player->getOrdersList()) : nullptr);
+            players->push_back(copy);
         }
     }
 
@@ -393,6 +414,8 @@ void GameEngine::clear()
     {
         for (Player *player : *players)
         {
+            delete player->getHand();
+            delete player->getOrdersList();
             delete player;
         }
         delete players;
@@ -685,7 +708,7 @@ void GameEngine::startupPhase()
             std::cout << "Available map files in directory:";
             if (availableMaps.empty())
             {
-                std::cout << " (none found in '.' or './maps')";
+                std::cout << " (none found)";
             }
             else
             {
@@ -758,16 +781,12 @@ bool GameEngine::handleLoadMap(const std::string &filename, std::string &effectO
     {
         effectOut = "Error: loadmap requires a  argument.";
         return false;
-    } // Check direct path first, then fallback to maps/
-    std::string resolvedPath = filename;
-    std::error_code ec;
-    if (!std::filesystem::exists(resolvedPath, ec))
+    }
+    std::string resolvedPath = resolveMapPath(filename);
+    if (resolvedPath.empty())
     {
-        std::filesystem::path fallback = std::filesystem::path("maps") / filename;
-        if (std::filesystem::exists(fallback, ec))
-        {
-            resolvedPath = fallback.string();
-        }
+        effectOut = "Error: Map file '" + filename + "' was not found in the map directories.";
+        return false;
     }
     MapLoader loader;
     Map *loadedMap = nullptr;
